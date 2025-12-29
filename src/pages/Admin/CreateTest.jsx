@@ -1,11 +1,14 @@
 // src/pages/Admin/CreateTest.jsx
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom'; // Added useParams
+import { useNavigate, useParams } from 'react-router-dom';
 
 const CreateTest = () => {
   const navigate = useNavigate();
-  const { id } = useParams(); // Get ID from URL (if editing)
-  const isEditMode = !!id;    // Boolean: true if editing, false if creating
+  const { id } = useParams();
+  const isEditMode = !!id;
+
+  // --- CONFIG: Matches your .env variable ---
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
   const [testTitle, setTestTitle] = useState('');
   
@@ -39,24 +42,23 @@ const CreateTest = () => {
   useEffect(() => {
     if (isEditMode) {
         setStatus({ loading: true, error: '', success: '' });
-        fetch(`http://localhost:3001/api/tests/${id}`)
+        
+        // --- UPDATED: Removed '/api' because it is in the env variable ---
+        fetch(`${API_BASE_URL}/tests/${id}`)
             .then(res => {
                 if (!res.ok) throw new Error("Failed to fetch test data");
                 return res.json();
             })
             .then(data => {
-                // Populate Form
                 setTestTitle(data.title);
                 setQuestions(data.questions);
                 setSelectedIcon(data.icon || 'nursing');
                 
-                // Parse Duration
                 if (timeOptions.includes(data.duration)) {
                     setDurationMode('select');
                     setSelectedDuration(data.duration);
                 } else {
                     setDurationMode('custom');
-                    // Simple parser for "X hr Y mins"
                     const hMatch = data.duration.match(/(\d+)\s*hr/);
                     const mMatch = data.duration.match(/(\d+)\s*min/);
                     setCustomHours(hMatch ? parseInt(hMatch[1]) : 0);
@@ -68,7 +70,7 @@ const CreateTest = () => {
                 setStatus({ loading: false, error: err.message, success: '' });
             });
     }
-  }, [id, isEditMode]);
+  }, [id, isEditMode, API_BASE_URL]);
 
 
   // --- LOGIC ---
@@ -146,10 +148,10 @@ const CreateTest = () => {
     setStatus({ loading: true, error: '', success: '' });
 
     try {
-      // --- DYNAMIC URL & METHOD ---
+      // --- UPDATED: Removed '/api' from here as well ---
       const url = isEditMode 
-        ? `http://localhost:3001/api/tests/${id}` 
-        : 'http://localhost:3001/api/tests';
+        ? `${API_BASE_URL}/tests/${id}` 
+        : `${API_BASE_URL}/tests`;
         
       const method = isEditMode ? 'PUT' : 'POST';
 
@@ -163,8 +165,6 @@ const CreateTest = () => {
 
       setStatus({ loading: false, error: '', success: `Assessment ${isEditMode ? 'updated' : 'created'} successfully!` });
       
-      // If editing, go back to dashboard after a delay
-      // If creating, reset form to allow another
       if (isEditMode) {
           setTimeout(() => navigate('/admin'), 1500);
       } else {
