@@ -23,7 +23,7 @@ export function Hero(){
             </div>
 
             {/* Navbar Section */}
-            <div className="pt-16 md:pt-0 col-span-2 md:col-span-9 flex items-center justify-end">
+            <div className="pt-[76px] md:pt-0 col-span-2 md:col-span-9 flex items-center justify-end">
                 <Navbar/>
             </div>
         </div>
