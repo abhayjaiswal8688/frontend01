@@ -1,12 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { PlayCircle, BookOpen, Video, ExternalLink, Sparkles } from 'lucide-react';
 
+// API Base URL - Updated to use Vite Environment Variable
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
+
 export function Resource() {
     const [resources, setResources] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        fetch('http://localhost:3001/api/resources')
+        // Use API_BASE constant
+        fetch(`${API_BASE}/resources`)
             .then(res => res.json())
             .then(data => {
                 setResources(data);
@@ -62,7 +66,7 @@ export function Resource() {
                                               </div>
                                           </div>
                                       </div>
-                                  </a>
+                                    </a>
 
                                 {/* Content Section */}
                                 <div className="p-8">
