@@ -64,7 +64,11 @@ export function Navbar() {
 
   return (
     // Main Navbar Container
-    <div className="w-full bg-pink-50 shadow-sm md:bg-transparent md:shadow-none z-50 relative transition-colors duration-300">
+    // Used inline style for background to ensure it overrides any transparency issues
+    <div 
+      className="w-full shadow-sm md:bg-transparent md:shadow-none z-50 relative transition-colors duration-300"
+      style={{ backgroundColor: isMobileOpen ? '#FFF0F5' : 'rgba(255, 240, 245, 0.95)' }}
+    >
       
       {/* Desktop Navbar */}
       <div className="hidden md:flex justify-end items-center space-x-8">
@@ -101,7 +105,7 @@ export function Navbar() {
       <div className="md:hidden flex justify-end items-center p-4">
         <button 
           onClick={() => setIsMobileOpen(true)} 
-          className="p-2 text-slate-700 hover:bg-pink-100 rounded-lg transition-colors"
+          className="p-2 text-slate-700 hover:bg-white/50 rounded-lg transition-colors"
         >
           <Menu size={24} />
         </button>
@@ -109,13 +113,12 @@ export function Navbar() {
 
       {/* Mobile Side Drawer */}
       <div
-        // UPDATED: Changed 'bg-white' to 'bg-pink-50' here so the whole drawer is pink
-        className={`fixed inset-y-0 right-0 w-72 bg-pink-50 shadow-2xl z-[100] transform transition-transform duration-300 ease-in-out border-l border-pink-100 ${
+        // FORCE OPAQUE BACKGROUND: Added style={{ backgroundColor: '#FFF0F5' }}
+        style={{ backgroundColor: '#FFF0F5' }}
+        className={`fixed inset-y-0 right-0 w-72 shadow-2xl z-[100] transform transition-transform duration-300 ease-in-out border-l border-pink-200 ${
           isMobileOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        {/* Drawer Header */}
-        {/* UPDATED: Changed border color to blend with pink theme */}
         <div className="flex justify-between items-center px-6 py-5 border-b border-pink-200">
           <div className="text-lg font-bold text-slate-900">Menu</div>
           <button onClick={() => setIsMobileOpen(false)} className="p-1 text-slate-400 hover:text-slate-800 hover:bg-pink-200/50 rounded-full transition-colors">
@@ -123,15 +126,14 @@ export function Navbar() {
           </button>
         </div>
         
-        {/* Drawer Links */}
-        <div className="flex flex-col px-6 py-6 gap-6">
+        <div className="flex flex-col px-6 py-6 gap-6 h-full overflow-y-auto">
           <MobileNavLink href="/" closeMenu={() => setIsMobileOpen(false)}>Home</MobileNavLink>
           <MobileNavLink href="/CommunityFeed" closeMenu={() => setIsMobileOpen(false)}>Peer Support</MobileNavLink>
           <MobileNavLink href="/test" closeMenu={() => setIsMobileOpen(false)}>Take a Test</MobileNavLink>
           <MobileNavLink href="/resource" closeMenu={() => setIsMobileOpen(false)}>Resources</MobileNavLink>
           
           {isAdmin && (
-             <div className="py-2 px-4 bg-white/50 rounded-xl border border-purple-100">
+             <div className="py-2 px-4 bg-white rounded-xl border border-pink-200 shadow-sm">
                  <MobileNavLink href="/admin" closeMenu={() => setIsMobileOpen(false)}>
                     <span className="text-purple-700 font-bold flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-purple-600 animate-pulse"></span>
@@ -147,7 +149,7 @@ export function Navbar() {
             <div className="flex flex-col gap-4">
                 <button 
                     onClick={() => { navigate('/profile'); setIsMobileOpen(false); }}
-                    className="flex items-center gap-3 w-full p-3 rounded-xl bg-white/60 text-slate-700 font-semibold hover:bg-white transition-colors border border-pink-100"
+                    className="flex items-center gap-3 w-full p-3 rounded-xl bg-white text-slate-700 font-semibold hover:bg-pink-100 transition-colors border border-pink-100 shadow-sm"
                 >
                     <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold text-sm">
                         {user.name ? user.name[0].toUpperCase() : 'U'}
@@ -156,7 +158,7 @@ export function Navbar() {
                 </button>
                 <button 
                     onClick={() => { handleLogout(); setIsMobileOpen(false); }}
-                    className="w-full py-3 text-sm font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-colors"
+                    className="w-full py-3 text-sm font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-colors border border-red-100"
                 >
                     Log Out
                 </button>
