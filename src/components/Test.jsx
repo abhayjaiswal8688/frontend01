@@ -84,7 +84,7 @@ const Test = () => {
   const fetchTests = async () => {
     try {
       // ✅ UPDATED: Uses API_BASE_URL
-      const response = await fetch(`${API_BASE_URL}/api/tests`);
+      const response = await fetch(`${API_BASE_URL}/tests`);
       if (response.ok) {
         const data = await response.json();
         setAvailableTests(data);
@@ -100,7 +100,7 @@ const Test = () => {
     setLoading(true);
     try {
       // ✅ UPDATED: Uses API_BASE_URL
-      const response = await fetch(`${API_BASE_URL}/api/tests/${testId}`);
+      const response = await fetch(`${API_BASE_URL}/tests/${testId}`);
       if (response.ok) {
         const fullTestData = await response.json();
         setActiveTest(fullTestData);
