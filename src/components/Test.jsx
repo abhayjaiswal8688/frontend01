@@ -1,7 +1,9 @@
 // src/pages/Test.jsx
 import React, { useState, useEffect, useRef } from 'react';
-// Added Sparkles to the import list
 import { Search, Clock, HelpCircle, ArrowRight, CheckCircle, RotateCcw, LayoutDashboard, X, ChevronLeft, ChevronRight, Trophy, AlertTriangle, Maximize, Minimize, Sparkles } from 'lucide-react';
+
+// Define the API URL based on the environment
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
 
 const Test = () => {
   const [availableTests, setAvailableTests] = useState([]);
@@ -81,7 +83,8 @@ const Test = () => {
 
   const fetchTests = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/tests');
+      // ✅ UPDATED: Uses API_BASE_URL
+      const response = await fetch(`${API_BASE_URL}/api/tests`);
       if (response.ok) {
         const data = await response.json();
         setAvailableTests(data);
@@ -96,7 +99,8 @@ const Test = () => {
   const handleStartTest = async (testId) => {
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost:3001/api/tests/${testId}`);
+      // ✅ UPDATED: Uses API_BASE_URL
+      const response = await fetch(`${API_BASE_URL}/api/tests/${testId}`);
       if (response.ok) {
         const fullTestData = await response.json();
         setActiveTest(fullTestData);
@@ -337,10 +341,10 @@ const Test = () => {
                   {showResult ? (
                     <div className="text-center py-6">
                       <div className="mb-8 relative inline-block">
-                         <div className="absolute inset-0 bg-green-200 rounded-full blur-xl opacity-40 animate-pulse" />
-                         <div className="relative inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-green-100 to-emerald-50 rounded-full shadow-inner border border-green-200">
-                            <Trophy className="w-12 h-12 text-green-600" />
-                         </div>
+                          <div className="absolute inset-0 bg-green-200 rounded-full blur-xl opacity-40 animate-pulse" />
+                          <div className="relative inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-green-100 to-emerald-50 rounded-full shadow-inner border border-green-200">
+                             <Trophy className="w-12 h-12 text-green-600" />
+                          </div>
                       </div>
                       
                       <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-2">Test Completed!</h2>
