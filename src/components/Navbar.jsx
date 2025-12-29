@@ -21,7 +21,7 @@ function NavLink({ href, children }) {
 export function Navbar() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const navigate = useNavigate();
-  
+   
   const [user, setUser] = useState(null);
 
   useEffect(() => {
@@ -63,8 +63,10 @@ export function Navbar() {
   const isAdmin = user && user.role === 'admin';
 
   return (
-    // Changed: Removed bg-green-100 and shadow. Now it's transparent to fit inside Hero.
-    <div className="w-full bg-transparent">
+    // UPDATED: 
+    // - "bg-white/90 backdrop-blur-md shadow-sm" applies to Mobile (making it readable)
+    // - "md:bg-transparent md:shadow-none md:backdrop-blur-none" resets it for Desktop
+    <div className="w-full bg-white/90 backdrop-blur-md shadow-sm md:bg-transparent md:shadow-none md:backdrop-blur-none z-50 relative transition-colors duration-300">
       
       {/* Desktop Navbar */}
       <div className="hidden md:flex justify-end items-center space-x-8">
@@ -98,8 +100,8 @@ export function Navbar() {
       </div>
 
       {/* Mobile Menu Button */}
-      {/* Changed: Removed logo link, aligned button to right */}
-      <div className="md:hidden flex justify-end items-center">
+      {/* UPDATED: Added padding (p-4) to ensure the button doesn't touch the edges on mobile */}
+      <div className="md:hidden flex justify-end items-center p-4">
         <button 
           onClick={() => setIsMobileOpen(true)} 
           className="p-2 text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
