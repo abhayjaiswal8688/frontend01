@@ -395,7 +395,7 @@ export function Homepage() {
                         <div className="flex flex-col items-center justify-center gap-4">
                             <div className="p-1.5 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full shadow-lg">
                                 <img 
-                                    src="/images/homepage/mam.png" 
+                                    src="/images/Homepage/mam.png" 
                                     alt="Founder" 
                                     className="w-20 h-20 rounded-full border-4 border-white object-cover"
                                 />
