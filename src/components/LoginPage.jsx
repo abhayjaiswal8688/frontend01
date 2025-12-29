@@ -29,8 +29,8 @@ export function LoginPage() {
 
         // ✅ FIXED: Now uses the environment variable
         const endpoint = isLogin 
-            ? `${API_BASE_URL}/api/auth/login` 
-            : `${API_BASE_URL}/api/auth/register`;
+            ? `${API_BASE_URL}/auth/login` 
+            : `${API_BASE_URL}/auth/register`;
 
         try {
             const response = await fetch(endpoint, {
