@@ -54,7 +54,7 @@ export function Navbar() {
 
   const handleLogout = () => {
     localStorage.removeItem('user');
-    localStorage.removeItem('token'); // Ensure token is also cleared
+    localStorage.removeItem('token'); 
     setUser(null);
     window.dispatchEvent(new Event('local-storage-changed'));
     navigate('/');
@@ -63,9 +63,7 @@ export function Navbar() {
   const isAdmin = user && user.role === 'admin';
 
   return (
-    // UPDATED: 
-    // - "bg-pink-50" makes it solid light pink on mobile (no transparency).
-    // - "md:bg-transparent" keeps it clear on desktop.
+    // Main Navbar Container
     <div className="w-full bg-pink-50 shadow-sm md:bg-transparent md:shadow-none z-50 relative transition-colors duration-300">
       
       {/* Desktop Navbar */}
@@ -111,17 +109,21 @@ export function Navbar() {
 
       {/* Mobile Side Drawer */}
       <div
-        className={`fixed inset-y-0 right-0 w-72 bg-white shadow-2xl z-[100] transform transition-transform duration-300 ease-in-out border-l border-slate-100 ${
+        // UPDATED: Changed 'bg-white' to 'bg-pink-50' here so the whole drawer is pink
+        className={`fixed inset-y-0 right-0 w-72 bg-pink-50 shadow-2xl z-[100] transform transition-transform duration-300 ease-in-out border-l border-pink-100 ${
           isMobileOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        <div className="flex justify-between items-center px-6 py-5 border-b border-slate-100 bg-pink-50">
+        {/* Drawer Header */}
+        {/* UPDATED: Changed border color to blend with pink theme */}
+        <div className="flex justify-between items-center px-6 py-5 border-b border-pink-200">
           <div className="text-lg font-bold text-slate-900">Menu</div>
-          <button onClick={() => setIsMobileOpen(false)} className="p-1 text-slate-400 hover:text-slate-800 hover:bg-pink-100 rounded-full transition-colors">
+          <button onClick={() => setIsMobileOpen(false)} className="p-1 text-slate-400 hover:text-slate-800 hover:bg-pink-200/50 rounded-full transition-colors">
             <X size={24} />
           </button>
         </div>
         
+        {/* Drawer Links */}
         <div className="flex flex-col px-6 py-6 gap-6">
           <MobileNavLink href="/" closeMenu={() => setIsMobileOpen(false)}>Home</MobileNavLink>
           <MobileNavLink href="/CommunityFeed" closeMenu={() => setIsMobileOpen(false)}>Peer Support</MobileNavLink>
@@ -129,7 +131,7 @@ export function Navbar() {
           <MobileNavLink href="/resource" closeMenu={() => setIsMobileOpen(false)}>Resources</MobileNavLink>
           
           {isAdmin && (
-             <div className="py-2 px-4 bg-purple-50 rounded-xl border border-purple-100">
+             <div className="py-2 px-4 bg-white/50 rounded-xl border border-purple-100">
                  <MobileNavLink href="/admin" closeMenu={() => setIsMobileOpen(false)}>
                     <span className="text-purple-700 font-bold flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-purple-600 animate-pulse"></span>
@@ -139,13 +141,13 @@ export function Navbar() {
              </div>
           )}
           
-          <div className="h-px bg-slate-100 my-2" />
+          <div className="h-px bg-pink-200 my-2" />
 
           {user ? (
             <div className="flex flex-col gap-4">
                 <button 
                     onClick={() => { navigate('/profile'); setIsMobileOpen(false); }}
-                    className="flex items-center gap-3 w-full p-3 rounded-xl bg-slate-50 text-slate-700 font-semibold hover:bg-slate-100 transition-colors"
+                    className="flex items-center gap-3 w-full p-3 rounded-xl bg-white/60 text-slate-700 font-semibold hover:bg-white transition-colors border border-pink-100"
                 >
                     <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold text-sm">
                         {user.name ? user.name[0].toUpperCase() : 'U'}
@@ -189,7 +191,7 @@ function MobileNavLink({ href, children, closeMenu }) {
         navigate(href);
         closeMenu();
       }}
-      className="text-lg text-slate-600 hover:text-purple-700 cursor-pointer font-medium hover:pl-2 transition-all duration-200"
+      className="text-lg text-slate-700 hover:text-purple-700 cursor-pointer font-medium hover:pl-2 transition-all duration-200"
     >
       {children}
     </div>
