@@ -2,6 +2,11 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom'; 
 import { Sparkles } from 'lucide-react';
 
+// Define the API URL based on the environment
+// If the .env variable is missing, it falls back to localhost automatically
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+// NOTE: If you are using Create-React-App (not Vite), use: process.env.REACT_APP_API_BASE_URL
+
 export function LoginPage() {
     const navigate = useNavigate(); 
     const [isLogin, setIsLogin] = useState(true);
@@ -22,9 +27,10 @@ export function LoginPage() {
         e.preventDefault();
         setStatus({ loading: true, error: '', success: '' });
 
+        // ✅ FIXED: Now uses the environment variable
         const endpoint = isLogin 
-            ? 'http://localhost:3001/api/auth/login' 
-            : 'http://localhost:3001/api/auth/register';
+            ? `${API_BASE_URL}/api/auth/login` 
+            : `${API_BASE_URL}/api/auth/register`;
 
         try {
             const response = await fetch(endpoint, {
@@ -44,7 +50,6 @@ export function LoginPage() {
             }
 
             if (isLogin) {
-                // Keep token logic exactly as it was
                 localStorage.setItem('token', data.token); 
                 localStorage.setItem('user', JSON.stringify(data.user));
 
@@ -60,18 +65,13 @@ export function LoginPage() {
                     }
                 }, 1000);
             } else {
-                // NECESSARY CHANGE: Show verification message instead of immediate login switch
                 setStatus({ 
                     loading: false, 
                     error: '', 
                     success: 'Verification email sent! Please check your Gmail to activate your account.' 
                 });
                 
-                // Clear the password field for security
                 setFormData({ ...formData, password: '' });
-
-                // We stay on the register page so they can see the success message clearly.
-                // They will only be able to login AFTER they click the link in their email.
             }
 
         } catch (err) {
@@ -108,7 +108,6 @@ export function LoginPage() {
                     </div>
                 )}
                 
-                {/* Updated Success UI to be more noticeable for verification */}
                 {status.success && (
                     <div className="mb-6 p-3 text-sm text-green-700 bg-green-50 border border-green-100 rounded-xl font-medium">
                         {status.success}
