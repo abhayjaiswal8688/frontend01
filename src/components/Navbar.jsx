@@ -64,9 +64,9 @@ export function Navbar() {
 
   return (
     // UPDATED: 
-    // - "bg-white/90 backdrop-blur-md shadow-sm" applies to Mobile (making it readable)
-    // - "md:bg-transparent md:shadow-none md:backdrop-blur-none" resets it for Desktop
-    <div className="w-full bg-white/90 backdrop-blur-md shadow-sm md:bg-transparent md:shadow-none md:backdrop-blur-none z-50 relative transition-colors duration-300">
+    // - "bg-pink-50" makes it solid light pink on mobile (no transparency).
+    // - "md:bg-transparent" keeps it clear on desktop.
+    <div className="w-full bg-pink-50 shadow-sm md:bg-transparent md:shadow-none z-50 relative transition-colors duration-300">
       
       {/* Desktop Navbar */}
       <div className="hidden md:flex justify-end items-center space-x-8">
@@ -100,11 +100,10 @@ export function Navbar() {
       </div>
 
       {/* Mobile Menu Button */}
-      {/* UPDATED: Added padding (p-4) to ensure the button doesn't touch the edges on mobile */}
       <div className="md:hidden flex justify-end items-center p-4">
         <button 
           onClick={() => setIsMobileOpen(true)} 
-          className="p-2 text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+          className="p-2 text-slate-700 hover:bg-pink-100 rounded-lg transition-colors"
         >
           <Menu size={24} />
         </button>
@@ -112,13 +111,13 @@ export function Navbar() {
 
       {/* Mobile Side Drawer */}
       <div
-        className={`fixed inset-y-0 right-0 w-72 bg-white/95 backdrop-blur-xl shadow-2xl z-[100] transform transition-transform duration-300 ease-in-out border-l border-white/20 ${
+        className={`fixed inset-y-0 right-0 w-72 bg-white shadow-2xl z-[100] transform transition-transform duration-300 ease-in-out border-l border-slate-100 ${
           isMobileOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        <div className="flex justify-between items-center px-6 py-5 border-b border-slate-100">
+        <div className="flex justify-between items-center px-6 py-5 border-b border-slate-100 bg-pink-50">
           <div className="text-lg font-bold text-slate-900">Menu</div>
-          <button onClick={() => setIsMobileOpen(false)} className="p-1 text-slate-400 hover:text-slate-800 hover:bg-slate-50 rounded-full transition-colors">
+          <button onClick={() => setIsMobileOpen(false)} className="p-1 text-slate-400 hover:text-slate-800 hover:bg-pink-100 rounded-full transition-colors">
             <X size={24} />
           </button>
         </div>
