@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navbar } from "./Navbar";
-import logo from "../images/logo.jpg"; 
+import logo from "/images/logo.jpg"; 
 
 export function Hero(){
     return(
