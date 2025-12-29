@@ -77,7 +77,7 @@ export function Homepage() {
                         <div className="flex flex-col gap-8">
                             <div className="rounded-[2.5rem] overflow-hidden shadow-2xl border-4 border-white/40 bg-black aspect-square md:aspect-auto h-full max-h-[500px]">
                                 <img 
-                                    src="/src/images/Homepage/brain.png" 
+                                    src="/images/Homepage/brain.png" 
                                     alt="3D Brain Illustration" 
                                     className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity duration-700"
                                 />
@@ -395,7 +395,7 @@ export function Homepage() {
                         <div className="flex flex-col items-center justify-center gap-4">
                             <div className="p-1.5 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full shadow-lg">
                                 <img 
-                                    src="/src/images/homepage/mam.png" 
+                                    src="/images/homepage/mam.png" 
                                     alt="Founder" 
                                     className="w-20 h-20 rounded-full border-4 border-white object-cover"
                                 />
