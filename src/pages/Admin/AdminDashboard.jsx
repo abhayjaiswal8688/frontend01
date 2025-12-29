@@ -4,6 +4,10 @@ import { useNavigate } from 'react-router-dom';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
+  
+  // --- CONFIG: Get API URL from .env ---
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
   const [tests, setTests] = useState([]);
   const [resources, setResources] = useState([]); // New State
   const [loading, setLoading] = useState(true);
@@ -20,9 +24,10 @@ const AdminDashboard = () => {
     setUser(storedUser);
 
     // Fetch Tests & Resources in parallel
+    // UPDATED: Using API_BASE_URL without adding /api (since it's in the env var)
     Promise.all([
-        fetch('http://localhost:3001/api/tests').then(res => res.json()),
-        fetch('http://localhost:3001/api/resources').then(res => res.json())
+        fetch(`${API_BASE_URL}/tests`).then(res => res.json()),
+        fetch(`${API_BASE_URL}/resources`).then(res => res.json())
     ])
     .then(([testsData, resourcesData]) => {
         setTests(testsData);
@@ -33,7 +38,7 @@ const AdminDashboard = () => {
         console.error(err);
         setLoading(false);
     });
-  }, [navigate]);
+  }, [navigate, API_BASE_URL]);
 
   // --- REORDER LOGIC ---
   const saveOrder = async (endpoint, items) => {
@@ -156,11 +161,14 @@ const AdminDashboard = () => {
                             </div>
                         </div>
                         <div className="flex items-center gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                             <button onClick={() => handleMove(tests, setTests, 'http://localhost:3001/api/tests/reorder', index, 'up')} disabled={index === 0} className={`p-2 rounded hover:bg-slate-200 ${index === 0 ? 'text-slate-300' : 'text-slate-500'}`}><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" /></svg></button>
-                             <button onClick={() => handleMove(tests, setTests, 'http://localhost:3001/api/tests/reorder', index, 'down')} disabled={index === tests.length - 1} className={`p-2 rounded hover:bg-slate-200 ${index === tests.length - 1 ? 'text-slate-300' : 'text-slate-500'}`}><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg></button>
+                             {/* UPDATED: Dynamic URLs for Reordering */}
+                             <button onClick={() => handleMove(tests, setTests, `${API_BASE_URL}/tests/reorder`, index, 'up')} disabled={index === 0} className={`p-2 rounded hover:bg-slate-200 ${index === 0 ? 'text-slate-300' : 'text-slate-500'}`}><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" /></svg></button>
+                             <button onClick={() => handleMove(tests, setTests, `${API_BASE_URL}/tests/reorder`, index, 'down')} disabled={index === tests.length - 1} className={`p-2 rounded hover:bg-slate-200 ${index === tests.length - 1 ? 'text-slate-300' : 'text-slate-500'}`}><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg></button>
                              <div className="h-6 w-px bg-slate-200 mx-1"></div>
                              <button onClick={() => navigate(`/admin/edit-test/${test._id}`)} className="p-2 text-purple-500 hover:bg-purple-50 rounded"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>
-                             <button onClick={() => handleDelete('http://localhost:3001/api/tests', test._id, test.title, tests, setTests)} className="p-2 text-red-500 hover:bg-red-50 rounded"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                             
+                             {/* UPDATED: Dynamic URL for Delete */}
+                             <button onClick={() => handleDelete(`${API_BASE_URL}/tests`, test._id, test.title, tests, setTests)} className="p-2 text-red-500 hover:bg-red-50 rounded"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                         </div>
                     </div>
                 ))}
@@ -178,7 +186,7 @@ const AdminDashboard = () => {
             
             <div className="divide-y divide-slate-100">
                 {resources.length === 0 ? (
-                     <div className="p-8 text-center text-slate-400">No videos added yet.</div>
+                      <div className="p-8 text-center text-slate-400">No videos added yet.</div>
                 ) : resources.map((item, index) => (
                     <div key={item._id} className="p-4 sm:p-5 hover:bg-slate-50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4 group">
                         <div className="flex items-center gap-4 flex-1">
@@ -192,11 +200,14 @@ const AdminDashboard = () => {
                             </div>
                         </div>
                         <div className="flex items-center gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                             <button onClick={() => handleMove(resources, setResources, 'http://localhost:3001/api/resources/reorder', index, 'up')} disabled={index === 0} className={`p-2 rounded hover:bg-slate-200 ${index === 0 ? 'text-slate-300' : 'text-slate-500'}`}><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" /></svg></button>
-                             <button onClick={() => handleMove(resources, setResources, 'http://localhost:3001/api/resources/reorder', index, 'down')} disabled={index === resources.length - 1} className={`p-2 rounded hover:bg-slate-200 ${index === resources.length - 1 ? 'text-slate-300' : 'text-slate-500'}`}><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg></button>
+                             {/* UPDATED: Dynamic URLs for Reordering */}
+                             <button onClick={() => handleMove(resources, setResources, `${API_BASE_URL}/resources/reorder`, index, 'up')} disabled={index === 0} className={`p-2 rounded hover:bg-slate-200 ${index === 0 ? 'text-slate-300' : 'text-slate-500'}`}><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" /></svg></button>
+                             <button onClick={() => handleMove(resources, setResources, `${API_BASE_URL}/resources/reorder`, index, 'down')} disabled={index === resources.length - 1} className={`p-2 rounded hover:bg-slate-200 ${index === resources.length - 1 ? 'text-slate-300' : 'text-slate-500'}`}><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg></button>
                              <div className="h-6 w-px bg-slate-200 mx-1"></div>
                              <button onClick={() => navigate(`/admin/edit-resource/${item._id}`)} className="p-2 text-purple-500 hover:bg-purple-50 rounded"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>
-                             <button onClick={() => handleDelete('http://localhost:3001/api/resources', item._id, item.title, resources, setResources)} className="p-2 text-red-500 hover:bg-red-50 rounded"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                             
+                             {/* UPDATED: Dynamic URL for Delete */}
+                             <button onClick={() => handleDelete(`${API_BASE_URL}/resources`, item._id, item.title, resources, setResources)} className="p-2 text-red-500 hover:bg-red-50 rounded"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                         </div>
                     </div>
                 ))}
