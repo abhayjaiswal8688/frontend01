@@ -6,6 +6,9 @@ const AddResource = () => {
     const navigate = useNavigate();
     const { id } = useParams(); // Check if we have an ID (Edit Mode)
     const isEditMode = !!id;
+    
+    // --- CONFIG: Get API URL from .env ---
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
     const [formData, setFormData] = useState({ title: '', url: '', category: 'General' });
     const [status, setStatus] = useState({ loading: false, error: '', success: '' });
@@ -13,12 +16,13 @@ const AddResource = () => {
     // Fetch data if editing
     useEffect(() => {
         if (isEditMode) {
-            fetch(`http://localhost:3001/api/resources/${id}`)
+            // UPDATED: Use API_BASE_URL
+            fetch(`${API_BASE_URL}/resources/${id}`)
                 .then(res => res.json())
                 .then(data => setFormData({ title: data.title, url: data.url, category: data.category }))
                 .catch(err => console.error(err));
         }
-    }, [id, isEditMode]);
+    }, [id, isEditMode, API_BASE_URL]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -26,9 +30,10 @@ const AddResource = () => {
         const token = localStorage.getItem('token');
 
         try {
+            // UPDATED: Use API_BASE_URL
             const url = isEditMode 
-                ? `http://localhost:3001/api/resources/${id}` 
-                : 'http://localhost:3001/api/resources';
+                ? `${API_BASE_URL}/resources/${id}` 
+                : `${API_BASE_URL}/resources`;
             
             const method = isEditMode ? 'PUT' : 'POST';
 
