@@ -21,7 +21,7 @@ function NavLink({ href, children }) {
 export function Navbar() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const navigate = useNavigate();
-   
+  
   const [user, setUser] = useState(null);
 
   useEffect(() => {
@@ -52,26 +52,6 @@ export function Navbar() {
     };
   }, []);
 
-  // UPDATED: Fix for "Sliding" and Body Scroll Locking
-  useEffect(() => {
-    // 1. Permanently prevent horizontal scroll on the body to stop the page from sliding left/right
-    document.body.style.overflowX = "hidden";
-
-    // 2. Lock vertical scroll when the mobile menu is open
-    if (isMobileOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "auto";
-      document.body.style.overflowX = "hidden"; // Re-apply X-axis lock
-    }
-
-    return () => {
-      // Cleanup: Reset to default behavior when component unmounts
-      document.body.style.overflow = "auto";
-      document.body.style.overflowX = "auto";
-    };
-  }, [isMobileOpen]);
-
   const handleLogout = () => {
     localStorage.removeItem('user');
     localStorage.removeItem('token'); 
@@ -83,9 +63,7 @@ export function Navbar() {
   const isAdmin = user && user.role === 'admin';
 
   return (
-    // Main Navbar Container
-    // UPDATED: Used '!bg-[#FFF0F5]' to force solid pink on mobile, and '!bg-transparent' for desktop.
-    <div className="w-full !bg-[#FFF0F5] shadow-sm md:!bg-transparent md:shadow-none z-50 relative transition-colors duration-300">
+    <div className="w-full bg-transparent">
       
       {/* Desktop Navbar */}
       <div className="hidden md:flex justify-end items-center space-x-8">
@@ -119,37 +97,37 @@ export function Navbar() {
       </div>
 
       {/* Mobile Menu Button */}
-      <div className="md:hidden flex justify-end items-center p-4">
+      <div className="md:hidden flex justify-end items-center">
         <button 
           onClick={() => setIsMobileOpen(true)} 
-          className="p-2 text-slate-700 hover:bg-white/50 rounded-lg transition-colors"
+          className="p-2 text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
         >
           <Menu size={24} />
         </button>
       </div>
 
       {/* Mobile Side Drawer */}
+      {/* Added 'md:hidden' to force hide on desktop */}
       <div
-        // UPDATED: Added 'bg-[#FFF0F5]' to match the navbar pink
-        className={`fixed inset-y-0 right-0 w-72 bg-[#FFF0F5] shadow-2xl z-[100] transform transition-transform duration-300 ease-in-out border-l border-pink-200 ${
+        className={`fixed inset-y-0 right-0 w-72 bg-white shadow-2xl z-[100] transform transition-transform duration-300 ease-in-out border-l border-white/20 md:hidden ${
           isMobileOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        <div className="flex justify-between items-center px-6 py-5 border-b border-pink-200">
+        <div className="flex justify-between bg-white items-center px-6 py-5 border-b border-slate-100">
           <div className="text-lg font-bold text-slate-900">Menu</div>
-          <button onClick={() => setIsMobileOpen(false)} className="p-1 text-slate-400 hover:text-slate-800 hover:bg-pink-200/50 rounded-full transition-colors">
+          <button onClick={() => setIsMobileOpen(false)} className="p-1 text-slate-400 hover:text-slate-800 hover:bg-slate-50 rounded-full transition-colors">
             <X size={24} />
           </button>
         </div>
         
-        <div className="flex flex-col px-6 py-6 gap-6 h-full overflow-y-auto">
+        <div className="flex flex-col bg-white px-6 py-6 gap-6">
           <MobileNavLink href="/" closeMenu={() => setIsMobileOpen(false)}>Home</MobileNavLink>
           <MobileNavLink href="/CommunityFeed" closeMenu={() => setIsMobileOpen(false)}>Peer Support</MobileNavLink>
           <MobileNavLink href="/test" closeMenu={() => setIsMobileOpen(false)}>Take a Test</MobileNavLink>
           <MobileNavLink href="/resource" closeMenu={() => setIsMobileOpen(false)}>Resources</MobileNavLink>
           
           {isAdmin && (
-             <div className="py-2 px-4 bg-white rounded-xl border border-pink-200 shadow-sm">
+             <div className="py-2 px-4 bg-purple-50 rounded-xl border border-purple-100">
                  <MobileNavLink href="/admin" closeMenu={() => setIsMobileOpen(false)}>
                     <span className="text-purple-700 font-bold flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-purple-600 animate-pulse"></span>
@@ -159,13 +137,13 @@ export function Navbar() {
              </div>
           )}
           
-          <div className="h-px bg-pink-200 my-2" />
+          <div className="h-px bg-slate-100 my-2" />
 
           {user ? (
             <div className="flex flex-col gap-4">
                 <button 
                     onClick={() => { navigate('/profile'); setIsMobileOpen(false); }}
-                    className="flex items-center gap-3 w-full p-3 rounded-xl bg-white text-slate-700 font-semibold hover:bg-pink-100 transition-colors border border-pink-100 shadow-sm"
+                    className="flex items-center gap-3 w-full p-3 rounded-xl bg-slate-50 text-slate-700 font-semibold hover:bg-slate-100 transition-colors"
                 >
                     <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold text-sm">
                         {user.name ? user.name[0].toUpperCase() : 'U'}
@@ -174,7 +152,7 @@ export function Navbar() {
                 </button>
                 <button 
                     onClick={() => { handleLogout(); setIsMobileOpen(false); }}
-                    className="w-full py-3 text-sm font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-colors border border-red-100"
+                    className="w-full py-3 text-sm font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-colors"
                 >
                     Log Out
                 </button>
@@ -191,9 +169,11 @@ export function Navbar() {
       </div>
       
       {/* Overlay Backdrop */}
+      {/* Removed 'backdrop-blur-sm' to fix the awkward blur issue */}
+      {/* Added 'md:hidden' so the overlay doesn't persist on desktop resize */}
       {isMobileOpen && (
         <div
-          className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-[90]"
+          className="fixed inset-0 bg-slate-900/20 z-[90] md:hidden"
           onClick={() => setIsMobileOpen(false)}
         />
       )}
@@ -209,7 +189,7 @@ function MobileNavLink({ href, children, closeMenu }) {
         navigate(href);
         closeMenu();
       }}
-      className="text-lg text-slate-700 hover:text-purple-700 cursor-pointer font-medium hover:pl-2 transition-all duration-200"
+      className="text-lg text-slate-600 hover:text-purple-700 cursor-pointer font-medium hover:pl-2 transition-all duration-200"
     >
       {children}
     </div>
