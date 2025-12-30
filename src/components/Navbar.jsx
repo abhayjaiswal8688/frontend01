@@ -1,159 +1,215 @@
+// src/components/Navbar.jsx
 import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Menu, X } from "react-feather";
 
+// Custom Link Component
 function NavLink({ href, children }) {
   const navigate = useNavigate();
   return (
-    <div
+    <div 
       onClick={() => navigate(href)}
-      className="text-[15px] font-medium text-slate-600 hover:text-purple-700 cursor-pointer"
+      className="relative text-[15px] font-medium text-slate-600 hover:text-purple-700 cursor-pointer transition-colors duration-300 group"
     >
       {children}
+      {/* Animated Underline */}
+      <span className="absolute bottom-[-4px] left-0 w-full h-0.5 bg-gradient-to-r from-purple-600 to-blue-600 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 ease-out origin-left"></span>
     </div>
   );
 }
 
 export function Navbar() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [user, setUser] = useState(null);
   const navigate = useNavigate();
+   
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
-    const loadUser = () => {
-      const stored = localStorage.getItem("user");
-      setUser(stored ? JSON.parse(stored) : null);
+    const getUserFromStorage = () => {
+      const stored = localStorage.getItem('user');
+      if (stored) {
+        try {
+          return JSON.parse(stored);
+        } catch (e) {
+          return null;
+        }
+      }
+      return null;
     };
-    loadUser();
-    window.addEventListener("local-storage-changed", loadUser);
-    // also listen to native storage for other tabs
-    window.addEventListener("storage", loadUser);
+
+    setUser(getUserFromStorage());
+
+    const handleStorageChange = () => {
+      setUser(getUserFromStorage());
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('local-storage-changed', handleStorageChange);
+    
     return () => {
-      window.removeEventListener("local-storage-changed", loadUser);
-      window.removeEventListener("storage", loadUser);
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('local-storage-changed', handleStorageChange);
     };
   }, []);
 
-  // Lock background scroll while drawer is open
+  // UPDATED: Fix for "Sliding" and Body Scroll Locking
   useEffect(() => {
-    document.body.style.overflow = isMobileOpen ? "hidden" : "auto";
-    return () => {
+    // 1. Permanently prevent horizontal scroll on the body to stop the page from sliding left/right
+    document.body.style.overflowX = "hidden";
+
+    // 2. Lock vertical scroll when the mobile menu is open
+    if (isMobileOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
       document.body.style.overflow = "auto";
+      document.body.style.overflowX = "hidden"; // Re-apply X-axis lock
+    }
+
+    return () => {
+      // Cleanup: Reset to default behavior when component unmounts
+      document.body.style.overflow = "auto";
+      document.body.style.overflowX = "auto";
     };
   }, [isMobileOpen]);
 
   const handleLogout = () => {
-    localStorage.removeItem("user");
-    localStorage.removeItem("token");
-    window.dispatchEvent(new Event("local-storage-changed"));
-    navigate("/");
+    localStorage.removeItem('user');
+    localStorage.removeItem('token'); 
+    setUser(null);
+    window.dispatchEvent(new Event('local-storage-changed'));
+    navigate('/');
   };
 
+  const isAdmin = user && user.role === 'admin';
+
   return (
-    <>
-      {/* Fixed header */}
-      <header className="fixed top-0 left-0 w-full bg-pink-50 md:bg-transparent shadow-sm md:shadow-none z-[200]">
-        {/* Inner bar with explicit height so spacer can match it */}
-        <div className="min-h-[72px] flex items-center justify-end px-4">
-          {/* Desktop links */}
-          <nav className="hidden md:flex items-center gap-6">
-            <NavLink href="/">Home</NavLink>
-            <NavLink href="/CommunityFeed">Peer Support</NavLink>
-            <NavLink href="/test">Take a Test</NavLink>
-            <NavLink href="/resource">Resources</NavLink>
-            {user ? (
-              <>
-                <NavLink href="/profile">Profile</NavLink>
-                <button onClick={handleLogout} className="text-red-600 font-semibold">
-                  Logout
-                </button>
-              </>
-            ) : (
-              <NavLink href="/login">
-                <span className="bg-slate-900 text-white px-4 py-1 rounded-full text-sm">Login</span>
-              </NavLink>
-            )}
-          </nav>
+    // Main Navbar Container
+    // UPDATED: Used '!bg-[#FFF0F5]' to force solid pink on mobile, and '!bg-transparent' for desktop.
+    <div className="w-full !bg-[#FFF0F5] shadow-sm md:!bg-transparent md:shadow-none z-50 relative transition-colors duration-300">
+      
+      {/* Desktop Navbar */}
+      <div className="hidden md:flex justify-end items-center space-x-8">
+        <NavLink href="/">Homepage</NavLink>
+        <NavLink href="/CommunityFeed">Peer Support</NavLink>
+        <NavLink href="/test">Take a Test</NavLink>
 
-          {/* Mobile menu button */}
-          <div className="md:hidden ml-auto">
-            <button
-              aria-label="Open menu"
-              onClick={() => setIsMobileOpen(true)}
-              className="p-2 rounded-md text-slate-700 hover:bg-pink-100 transition-colors"
-            >
-              <Menu size={22} />
-            </button>
-          </div>
+        {isAdmin && (
+            <NavLink href="/admin">Admin Console</NavLink>
+        )}
+
+        <NavLink href="/resource">Resources</NavLink>
+        
+        <div className="flex items-center space-x-3 ml-4">
+          {user ? (
+            <>
+              <Link to="/profile" className="px-4 py-2 text-sm font-semibold bg-white/50 border border-slate-200 text-slate-800 rounded-full shadow-sm hover:bg-white hover:text-purple-700 transition-all flex items-center gap-2">
+                {isAdmin && <span className="bg-purple-100 text-purple-700 text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-bold">Admin</span>}
+                <span>Profile</span>
+              </Link>
+              <button onClick={handleLogout} className="px-4 py-2 text-sm font-semibold bg-red-50 text-red-600 border border-red-100 rounded-full hover:bg-red-600 hover:text-white transition-all shadow-sm">
+                Log Out
+              </button>
+            </>
+          ) : (
+            <Link to="/login" className="px-6 py-2.5 text-sm font-bold bg-slate-900 text-white rounded-full shadow-lg hover:shadow-purple-500/20 hover:scale-105 transition-all">
+              Log In
+            </Link>
+          )}
         </div>
-      </header>
+      </div>
 
-      {/* Spacer that prevents content (hero) from sitting under fixed header.
-          If you already added padding/top in App layout, remove it. */}
-      <div className="h-[72px] md:h-0" />
+      {/* Mobile Menu Button */}
+      <div className="md:hidden flex justify-end items-center p-4">
+        <button 
+          onClick={() => setIsMobileOpen(true)} 
+          className="p-2 text-slate-700 hover:bg-white/50 rounded-lg transition-colors"
+        >
+          <Menu size={24} />
+        </button>
+      </div>
 
-      {/* Side drawer */}
-      <aside
-        className={`fixed top-0 right-0 h-screen w-72 bg-white z-[300] shadow-xl transform transition-transform duration-300 ease-in-out ${
+      {/* Mobile Side Drawer */}
+      <div
+        // UPDATED: Added 'bg-[#FFF0F5]' to match the navbar pink
+        className={`fixed inset-y-0 right-0 w-72 bg-[#FFF0F5] shadow-2xl z-[100] transform transition-transform duration-300 ease-in-out border-l border-pink-200 ${
           isMobileOpen ? "translate-x-0" : "translate-x-full"
         }`}
-        aria-hidden={!isMobileOpen}
       >
-        <div className="flex items-center justify-between p-5 border-b">
-          <span className="font-bold text-slate-900">Menu</span>
-          <button
-            aria-label="Close menu"
-            onClick={() => setIsMobileOpen(false)}
-            className="p-1 rounded-full text-slate-600 hover:bg-pink-100"
-          >
-            <X size={20} />
+        <div className="flex justify-between items-center px-6 py-5 border-b border-pink-200">
+          <div className="text-lg font-bold text-slate-900">Menu</div>
+          <button onClick={() => setIsMobileOpen(false)} className="p-1 text-slate-400 hover:text-slate-800 hover:bg-pink-200/50 rounded-full transition-colors">
+            <X size={24} />
           </button>
         </div>
+        
+        <div className="flex flex-col px-6 py-6 gap-6 h-full overflow-y-auto">
+          <MobileNavLink href="/" closeMenu={() => setIsMobileOpen(false)}>Home</MobileNavLink>
+          <MobileNavLink href="/CommunityFeed" closeMenu={() => setIsMobileOpen(false)}>Peer Support</MobileNavLink>
+          <MobileNavLink href="/test" closeMenu={() => setIsMobileOpen(false)}>Take a Test</MobileNavLink>
+          <MobileNavLink href="/resource" closeMenu={() => setIsMobileOpen(false)}>Resources</MobileNavLink>
+          
+          {isAdmin && (
+             <div className="py-2 px-4 bg-white rounded-xl border border-pink-200 shadow-sm">
+                 <MobileNavLink href="/admin" closeMenu={() => setIsMobileOpen(false)}>
+                    <span className="text-purple-700 font-bold flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-purple-600 animate-pulse"></span>
+                        Admin Console
+                    </span>
+                 </MobileNavLink>
+             </div>
+          )}
+          
+          <div className="h-px bg-pink-200 my-2" />
 
-        <div className="flex flex-col gap-5 p-6">
-          <MobileNavLink href="/" close={() => setIsMobileOpen(false)}>Home</MobileNavLink>
-          <MobileNavLink href="/CommunityFeed" close={() => setIsMobileOpen(false)}>Peer Support</MobileNavLink>
-          <MobileNavLink href="/test" close={() => setIsMobileOpen(false)}>Take a Test</MobileNavLink>
-          <MobileNavLink href="/resource" close={() => setIsMobileOpen(false)}>Resources</MobileNavLink>
-
-          <div className="border-t pt-4">
-            {user ? (
-              <>
-                <MobileNavLink href="/profile" close={() => setIsMobileOpen(false)}>My Profile</MobileNavLink>
-                <button
-                  onClick={() => { handleLogout(); setIsMobileOpen(false); }}
-                  className="mt-3 text-red-600 font-semibold"
+          {user ? (
+            <div className="flex flex-col gap-4">
+                <button 
+                    onClick={() => { navigate('/profile'); setIsMobileOpen(false); }}
+                    className="flex items-center gap-3 w-full p-3 rounded-xl bg-white text-slate-700 font-semibold hover:bg-pink-100 transition-colors border border-pink-100 shadow-sm"
                 >
-                  Logout
+                    <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold text-sm">
+                        {user.name ? user.name[0].toUpperCase() : 'U'}
+                    </div>
+                    My Profile
                 </button>
-              </>
-            ) : (
-              <MobileNavLink href="/login" close={() => setIsMobileOpen(false)}>Login</MobileNavLink>
-            )}
-          </div>
+                <button 
+                    onClick={() => { handleLogout(); setIsMobileOpen(false); }}
+                    className="w-full py-3 text-sm font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-colors border border-red-100"
+                >
+                    Log Out
+                </button>
+            </div>
+          ) : (
+            <button 
+                onClick={() => { navigate('/login'); setIsMobileOpen(false); }}
+                className="w-full py-3.5 bg-slate-900 text-white rounded-xl font-bold shadow-lg hover:shadow-xl active:scale-95 transition-all"
+            >
+                Log In
+            </button>
+          )}
         </div>
-      </aside>
-
-      {/* Overlay */}
+      </div>
+      
+      {/* Overlay Backdrop */}
       {isMobileOpen && (
         <div
+          className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-[90]"
           onClick={() => setIsMobileOpen(false)}
-          className="fixed inset-0 bg-black/30 z-[250]"
         />
       )}
-    </>
+    </div>
   );
 }
 
-function MobileNavLink({ href, children, close }) {
+function MobileNavLink({ href, children, closeMenu }) {
   const navigate = useNavigate();
   return (
     <div
       onClick={() => {
         navigate(href);
-        if (typeof close === "function") close();
+        closeMenu();
       }}
-      className="text-lg text-slate-700 font-medium cursor-pointer"
+      className="text-lg text-slate-700 hover:text-purple-700 cursor-pointer font-medium hover:pl-2 transition-all duration-200"
     >
       {children}
     </div>
