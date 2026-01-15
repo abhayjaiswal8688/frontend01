@@ -67,7 +67,12 @@ export function Navbar() {
       
       {/* Desktop Navbar */}
       <div className="hidden md:flex justify-end items-center space-x-8">
-        <NavLink href="/">Homepage</NavLink>
+        {/* 1. Changed Homepage to Emotional IQ */}
+        <NavLink href="/">Emotional IQ</NavLink>
+        
+        {/* 2. Added PMR Link */}
+        <NavLink href="/pmr">PMR</NavLink>
+        
         <NavLink href="/CommunityFeed">Peer Support</NavLink>
         <NavLink href="/test">Take a Test</NavLink>
 
@@ -107,7 +112,6 @@ export function Navbar() {
       </div>
 
       {/* Mobile Side Drawer */}
-      {/* Added 'md:hidden' to force hide on desktop */}
       <div
         className={`fixed inset-y-0 right-0 w-72 bg-white shadow-2xl z-[100] transform transition-transform duration-300 ease-in-out border-l border-white/20 md:hidden ${
           isMobileOpen ? "translate-x-0" : "translate-x-full"
@@ -121,7 +125,10 @@ export function Navbar() {
         </div>
         
         <div className="flex flex-col bg-white px-6 py-6 gap-6">
-          <MobileNavLink href="/" closeMenu={() => setIsMobileOpen(false)}>Home</MobileNavLink>
+          {/* Mobile Links Updated */}
+          <MobileNavLink href="/" closeMenu={() => setIsMobileOpen(false)}>Emotional IQ</MobileNavLink>
+          <MobileNavLink href="/pmr" closeMenu={() => setIsMobileOpen(false)}>PMR</MobileNavLink>
+          
           <MobileNavLink href="/CommunityFeed" closeMenu={() => setIsMobileOpen(false)}>Peer Support</MobileNavLink>
           <MobileNavLink href="/test" closeMenu={() => setIsMobileOpen(false)}>Take a Test</MobileNavLink>
           <MobileNavLink href="/resource" closeMenu={() => setIsMobileOpen(false)}>Resources</MobileNavLink>
@@ -169,8 +176,6 @@ export function Navbar() {
       </div>
       
       {/* Overlay Backdrop */}
-      {/* Removed 'backdrop-blur-sm' to fix the awkward blur issue */}
-      {/* Added 'md:hidden' so the overlay doesn't persist on desktop resize */}
       {isMobileOpen && (
         <div
           className="fixed inset-0 bg-slate-900/20 z-[90] md:hidden"

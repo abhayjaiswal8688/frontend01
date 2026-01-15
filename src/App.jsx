@@ -19,6 +19,7 @@ import Test from './components/Test';
 import CreateTest from './pages/Admin/CreateTest';
 import AddResource from './pages/Admin/AddResource'; // <--- NEW IMPORT
 import AdminDashboard from './pages/Admin/AdminDashboard'; 
+import { PMR } from './pages/pmr';
 
 function App() {
 
@@ -31,6 +32,7 @@ function App() {
         <Route path="/resource" element={<Resource />} />
         <Route path="/CommunityFeed" element={<CommunityFeed/>} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/pmr" element={<PMR />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/test" element={<Test />} />
 
