@@ -72,7 +72,7 @@ export function Navbar() {
         
         {/* 2. Added PMR Link */}
         <NavLink href="/pmr">PMR</NavLink>
-        
+        <NavLink href="/courses">Courses</NavLink>
         <NavLink href="/CommunityFeed">Peer Support</NavLink>
         <NavLink href="/test">Take a Test</NavLink>
 
@@ -81,11 +81,11 @@ export function Navbar() {
         )}
 
         <NavLink href="/resource">Resources</NavLink>
-        
+
         <div className="flex items-center space-x-3 ml-4">
           {user ? (
             <>
-              <Link to="/profile" className="px-4 py-2 text-sm font-semibold bg-white/50 border border-slate-200 text-slate-800 rounded-full shadow-sm hover:bg-white hover:text-purple-700 transition-all flex items-center gap-2">
+              <Link to="/dashboard" className="px-4 py-2 text-sm font-semibold bg-white/50 border border-slate-200 text-slate-800 rounded-full shadow-sm hover:bg-white hover:text-purple-700 transition-all flex items-center gap-2">
                 {isAdmin && <span className="bg-purple-100 text-purple-700 text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-bold">Admin</span>}
                 <span>Profile</span>
               </Link>
