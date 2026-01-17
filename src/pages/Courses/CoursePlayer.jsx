@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { 
     PlayCircle, FileText, Lock, Menu, ChevronLeft, ChevronRight, 
     CheckCircle, Trophy, Circle, HelpCircle, Clock, AlertTriangle, 
-    Maximize, Minimize 
+    Maximize, Minimize, Square, CheckSquare 
 } from 'lucide-react';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -16,7 +16,10 @@ const CoursePlayer = () => {
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState(null); 
+  
+  // State for tracking
   const [completedLessons, setCompletedLessons] = useState([]); 
+  const [courseProgress, setCourseProgress] = useState(0); // Store overall % locally
   
   const [activeModuleIndex, setActiveModuleIndex] = useState(0);
   const [activeLessonIndex, setActiveLessonIndex] = useState(0);
@@ -53,8 +56,9 @@ const CoursePlayer = () => {
                 const data = await res.json();
                 setCourse(data.course);
                 setStatus(data.enrollmentStatus);
-                if (data.enrollment && data.enrollment.progress) {
-                    setCompletedLessons(data.enrollment.progress);
+                if (data.enrollment) {
+                    setCompletedLessons(data.enrollment.progress || []);
+                    setCourseProgress(data.enrollment.courseProgress || 0);
                 }
             }
         } catch (err) {
@@ -69,8 +73,6 @@ const CoursePlayer = () => {
   // --- RESET STATE ON LESSON CHANGE ---
   useEffect(() => {
     setQuizState({ currentIndex: 0, answers: {}, score: null, showResult: false });
-    
-    // Timer Setup for Quizzes
     const currentLesson = course?.modules[activeModuleIndex]?.lessons[activeLessonIndex];
     if (currentLesson?.type === 'quiz') {
         const seconds = parseDurationToSeconds(currentLesson.duration || "10 mins");
@@ -83,16 +85,13 @@ const CoursePlayer = () => {
   // --- TIMER COUNTDOWN ---
   useEffect(() => {
     if (timeLeft === null || timeLeft < 0 || quizState.showResult) return;
-
     if (timeLeft === 0) {
-        submitQuiz(); // Auto-submit when time runs out
+        submitQuiz(); 
         return;
     }
-
     const timerId = setInterval(() => {
         setTimeLeft((prev) => prev - 1);
     }, 1000);
-
     return () => clearInterval(timerId);
   }, [timeLeft, quizState.showResult]);
 
@@ -138,7 +137,7 @@ const CoursePlayer = () => {
     if (!document.fullscreenElement) {
         if (playerContainerRef.current) {
             playerContainerRef.current.requestFullscreen().catch(err => {
-                console.error(`Error enabling full-screen mode: ${err.message}`);
+                console.error(err);
             });
         }
     } else {
@@ -146,34 +145,54 @@ const CoursePlayer = () => {
     }
   };
 
-  // --- ACTIONS ---
-  const toggleLessonCompletion = async () => {
-      const currentModule = course.modules[activeModuleIndex];
-      const currentLesson = currentModule.lessons[activeLessonIndex];
+  // --- UPDATED: SAVE PROGRESS (Generic) ---
+  const saveProgressToBackend = async (lessonId, moduleId, type, quizData = null) => {
       const token = localStorage.getItem('token');
       const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-      const isCurrentlyCompleted = completedLessons.includes(currentLesson._id);
-      
-      // Optimistic UI Update
-      if (isCurrentlyCompleted) {
-          setCompletedLessons(prev => prev.filter(id => id !== currentLesson._id));
-      } else {
-          setCompletedLessons(prev => [...prev, currentLesson._id]);
-      }
-
       try {
-          await fetch(`${API_BASE_URL}/courses/${id}/toggle-progress`, {
+          const res = await fetch(`${API_BASE_URL}/courses/${id}/update-lesson-progress`, {
               method: 'POST',
               headers: { 
                   'Content-Type': 'application/json',
                   'Authorization': `Bearer ${token}` 
               },
-              body: JSON.stringify({ userId: user.id, lessonId: currentLesson._id, completed: !isCurrentlyCompleted })
+              body: JSON.stringify({ 
+                  userId: user.id, 
+                  lessonId, 
+                  moduleId,
+                  type,
+                  quizData // Optional: { score, totalQuestions, passed }
+              })
           });
+
+          if (res.ok) {
+              const data = await res.json();
+              setCompletedLessons(data.progress); // Update local list
+              setCourseProgress(data.courseProgress); // Update local %
+          }
       } catch (err) {
           console.error("Failed to save progress", err);
       }
+  };
+
+  // --- UPDATED: HANDLE LESSON COMPLETION (Video/Text) ---
+  const handleMarkComplete = async () => {
+      const currentModule = course.modules[activeModuleIndex];
+      const currentLesson = currentModule.lessons[activeLessonIndex];
+      const isCurrentlyCompleted = completedLessons.includes(currentLesson._id);
+
+      // Optimistic UI Update (Toggle)
+      if (isCurrentlyCompleted) {
+          // If unmarking, we need logic to remove it. 
+          // For simplicity, let's assume this button currently only MARKS as complete in this new system
+          // or we can add an 'unmark' flag to the backend if needed. 
+          // Current backend implementation mainly ADDS progress. 
+          // We will focus on marking complete for now.
+          return; 
+      }
+
+      await saveProgressToBackend(currentLesson._id, currentModule._id, currentLesson.type);
   };
 
   const handleNext = () => {
@@ -199,21 +218,63 @@ const CoursePlayer = () => {
   };
 
   const handleQuizOptionSelect = (optionIdx) => {
-      setQuizState(prev => ({ ...prev, answers: { ...prev.answers, [prev.currentIndex]: optionIdx } }));
+      const currentLesson = course.modules[activeModuleIndex].lessons[activeLessonIndex];
+      const currentQuestion = currentLesson.questions[quizState.currentIndex];
+      const isMultiple = currentQuestion.type === 'multiple';
+
+      setQuizState(prev => {
+          const currentAnswers = prev.answers[prev.currentIndex] || [];
+          let newAnswers;
+          if (isMultiple) {
+              if (currentAnswers.includes(optionIdx)) {
+                  newAnswers = currentAnswers.filter(i => i !== optionIdx);
+              } else {
+                  newAnswers = [...currentAnswers, optionIdx];
+              }
+          } else {
+              newAnswers = [optionIdx];
+          }
+          return { ...prev, answers: { ...prev.answers, [prev.currentIndex]: newAnswers } };
+      });
   };
 
-  const submitQuiz = () => {
-      const currentLesson = course.modules[activeModuleIndex].lessons[activeLessonIndex];
+  // --- UPDATED: SUBMIT QUIZ ---
+  const submitQuiz = async () => {
+      const currentModule = course.modules[activeModuleIndex];
+      const currentLesson = currentModule.lessons[activeLessonIndex];
       let correctCount = 0;
-      currentLesson.questions.forEach((q, idx) => {
-          if (quizState.answers[idx] === q.correctOptionIndex) correctCount++;
-      });
-      setQuizState(prev => ({ ...prev, score: correctCount, showResult: true }));
-      setTimeLeft(null); // Stop timer
       
-      if (correctCount / currentLesson.questions.length >= 0.5 && !completedLessons.includes(currentLesson._id)) {
-          toggleLessonCompletion();
-      }
+      currentLesson.questions.forEach((q, idx) => {
+          const userAnswers = quizState.answers[idx] || [];
+          const correctIndices = q.correctOptionIndices && q.correctOptionIndices.length > 0 
+              ? q.correctOptionIndices 
+              : [q.correctOptionIndex]; 
+
+          const sortedUser = [...userAnswers].sort((a, b) => a - b);
+          const sortedCorrect = [...correctIndices].sort((a, b) => a - b);
+
+          const isCorrect = sortedUser.length === sortedCorrect.length && 
+              sortedUser.every((val, i) => val === sortedCorrect[i]);
+          
+          if (isCorrect) correctCount++;
+      });
+
+      setQuizState(prev => ({ ...prev, score: correctCount, showResult: true }));
+      setTimeLeft(null); 
+      
+      const passed = (correctCount / currentLesson.questions.length) >= 0.5;
+
+      // Send detailed score to backend
+      await saveProgressToBackend(
+          currentLesson._id, 
+          currentModule._id, 
+          'quiz', 
+          { 
+              score: correctCount, 
+              totalQuestions: currentLesson.questions.length, 
+              passed 
+          }
+      );
   };
 
   if (loading) return <div className="h-screen flex items-center justify-center bg-slate-900 text-white font-medium animate-pulse">Loading Classroom...</div>;
@@ -223,13 +284,14 @@ const CoursePlayer = () => {
   const currentModule = course.modules[activeModuleIndex];
   const currentLesson = currentModule?.lessons[activeLessonIndex];
   const isLessonCompleted = completedLessons.includes(currentLesson?._id);
-  const totalLessons = course.modules.reduce((acc, m) => acc + m.lessons.length, 0);
-  const progressPercentage = Math.round((completedLessons.length / totalLessons) * 100) || 0;
 
+  // Use the progress from backend or calculate if needed, but backend is source of truth now
+  // For the sidebar visual, we use the backend's `courseProgress`
+  
   return (
     <div className="h-screen flex flex-col md:flex-row bg-slate-50 font-sans overflow-hidden">
         
-        {/* === SIDEBAR (Hidden in Fullscreen) === */}
+        {/* === SIDEBAR === */}
         {!isFullscreen && (
             <div 
                 className={`
@@ -244,11 +306,11 @@ const CoursePlayer = () => {
                         <button onClick={() => setSidebarOpen(false)} className="md:hidden p-1 text-slate-400 hover:text-slate-600"><ChevronLeft /></button>
                     </div>
                     <div className="flex justify-between text-xs font-semibold text-slate-500 mb-1">
-                        <span>Progress</span>
-                        <span>{progressPercentage}%</span>
+                        <span>Overall Progress</span>
+                        <span>{courseProgress}%</span>
                     </div>
                     <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                        <div className="bg-emerald-500 h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${progressPercentage}%` }} />
+                        <div className="bg-emerald-500 h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${courseProgress}%` }} />
                     </div>
                 </div>
                 
@@ -300,7 +362,6 @@ const CoursePlayer = () => {
                 </div>
                 
                 <div className="ml-auto flex items-center gap-3">
-                    {/* TIMER DISPLAY (Only for Quiz) */}
                     {currentLesson?.type === 'quiz' && timeLeft !== null && !quizState.showResult && (
                         <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-mono font-bold text-sm transition-colors ${timeLeft < 60 ? 'bg-red-100 text-red-600 animate-pulse border border-red-200' : 'bg-slate-100 text-slate-700 border border-slate-200'}`}>
                             {timeLeft < 60 && <AlertTriangle size={14} />}
@@ -309,7 +370,6 @@ const CoursePlayer = () => {
                         </div>
                     )}
 
-                    {/* FULLSCREEN TOGGLE */}
                     <button 
                         onClick={toggleFullScreen}
                         className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors"
@@ -324,7 +384,7 @@ const CoursePlayer = () => {
                 </div>
             </div>
 
-            {/* Video/Text/Quiz Viewer */}
+            {/* Viewer */}
             <div className={`flex-1 overflow-y-auto p-4 md:p-8 flex flex-col items-center ${isFullscreen ? 'justify-center bg-slate-900' : ''}`}>
                 <div className={`w-full max-w-5xl bg-white rounded-2xl shadow-xl shadow-slate-200/50 overflow-hidden border border-slate-100 min-h-[50vh] ${isFullscreen ? 'h-full max-w-none rounded-none border-none shadow-none' : ''}`}>
                     
@@ -357,7 +417,6 @@ const CoursePlayer = () => {
                             )}
                         </div>
                     ) : currentLesson?.type === 'quiz' ? (
-                        // --- QUIZ PLAYER (Updated: overflow-y-auto is now unconditional) ---
                         <div className={`p-8 md:p-12 h-full flex flex-col overflow-y-auto ${isFullscreen ? 'bg-white' : ''}`}>
                             {quizState.showResult ? (
                                 <div className="flex-1 flex flex-col items-center justify-center text-center py-8">
@@ -378,8 +437,9 @@ const CoursePlayer = () => {
                                         >
                                             Retry Quiz
                                         </button>
+                                        {/* Continue Button just moves next, completion handled by submit */}
                                         <button 
-                                            onClick={toggleLessonCompletion}
+                                            onClick={handleNext}
                                             className="px-8 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-purple-600 transition-all shadow-lg hover:shadow-purple-500/20"
                                         >
                                             Continue
@@ -405,11 +465,17 @@ const CoursePlayer = () => {
                                     
                                     <h2 className="text-2xl md:text-3xl font-bold text-slate-800 mb-8 leading-snug">
                                         {currentLesson.questions[quizState.currentIndex].questionText}
+                                        {currentLesson.questions[quizState.currentIndex].type === 'multiple' && (
+                                            <span className="block text-sm font-normal text-slate-500 mt-2">(Select all that apply)</span>
+                                        )}
                                     </h2>
                                     
                                     <div className="space-y-4 mb-10">
                                         {currentLesson.questions[quizState.currentIndex].options.map((opt, idx) => {
-                                            const isSelected = quizState.answers[quizState.currentIndex] === idx;
+                                            const currentAnswers = quizState.answers[quizState.currentIndex] || [];
+                                            const isSelected = currentAnswers.includes(idx);
+                                            const isMultiple = currentLesson.questions[quizState.currentIndex].type === 'multiple';
+
                                             return (
                                                 <div 
                                                     key={idx} 
@@ -420,10 +486,16 @@ const CoursePlayer = () => {
                                                         : 'border-slate-100 bg-white hover:border-purple-200 hover:bg-slate-50'
                                                     }`}
                                                 >
-                                                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mr-5 shrink-0 transition-colors ${
+                                                    <div className={`w-6 h-6 border-2 flex items-center justify-center mr-5 shrink-0 transition-colors ${
+                                                        isMultiple ? 'rounded-md' : 'rounded-full' 
+                                                    } ${
                                                         isSelected ? 'border-purple-600 bg-purple-600' : 'border-slate-300 group-hover:border-purple-400'
                                                     }`}>
-                                                        {isSelected && <div className="w-2 h-2 bg-white rounded-full"></div>}
+                                                        {isSelected && (
+                                                            isMultiple 
+                                                            ? <CheckSquare size={14} className="text-white" />
+                                                            : <div className="w-2 h-2 bg-white rounded-full"></div>
+                                                        )}
                                                     </div>
                                                     <span className={`text-lg ${isSelected ? 'text-purple-900 font-semibold' : 'text-slate-600 group-hover:text-slate-900'}`}>
                                                         {opt}
@@ -463,7 +535,7 @@ const CoursePlayer = () => {
                         </div>
                     ) : (
                         // --- TEXT LESSON ---
-                        <div className={`p-8 md:p-16 prose max-w-none ${isFullscreen ? 'bg-white h-full overflow-y-auto' : ''}`}>
+                        <div className={`p-8 md:p-16 prose max-w-none h-full overflow-y-auto ${isFullscreen ? 'bg-white' : ''}`}>
                             <h2 className="text-3xl font-bold mb-6 text-slate-900 border-b border-slate-100 pb-4">{currentLesson?.title}</h2>
                             <div className="text-slate-600 leading-relaxed whitespace-pre-wrap text-lg">
                                 {currentLesson?.textContent || "No text content available."}
@@ -473,7 +545,7 @@ const CoursePlayer = () => {
                 </div>
             </div>
             
-            {/* FOOTER CONTROLS - UPDATED */}
+            {/* FOOTER CONTROLS */}
             <div className="bg-white p-4 border-t border-slate-200 flex justify-between items-center shrink-0 z-20">
                 <button 
                     disabled={activeLessonIndex === 0 && activeModuleIndex === 0}
@@ -484,7 +556,7 @@ const CoursePlayer = () => {
                 </button>
                 
                 <button 
-                    onClick={toggleLessonCompletion}
+                    onClick={handleMarkComplete}
                     className={`flex items-center gap-2 px-6 py-2.5 rounded-xl cursor-pointer font-bold transition-all transform active:scale-95 ${
                         isLessonCompleted 
                         ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' 

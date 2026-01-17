@@ -20,12 +20,14 @@ import Test from './components/Test';
 import StudentDashboard from './pages/Admin/StudentDashboard';
 import AdminResults from './pages/Admin/AdminResults';
 import CreateTest from './pages/Admin/CreateTest';
-import AddResource from './pages/Admin/AddResource'; // <--- NEW IMPORT
+import AddResource from './pages/Admin/AddResource'; 
 import CreateCourse from './pages/Admin/CreateCourse';
 import AdminDashboard from './pages/Admin/AdminDashboard'; 
 import CourseCatalog from './pages/Courses/CourseCatalog';
 import CoursePlayer from './pages/Courses/CoursePlayer';
 import AdminEnrollments from './pages/Admin/AdminEnrollments';
+import StudentProgress from './pages/Admin/StudentProgress'; 
+import StudentDetails from './pages/Admin/StudentDetails'; // <--- NEW IMPORT
 
 function App() {
 
@@ -42,6 +44,7 @@ function App() {
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/test" element={<Test />} />
 
+        {/* === PROTECTED LEARNER ROUTES === */}
         <Route 
           path="/courses" 
           element={
@@ -60,7 +63,6 @@ function App() {
           } 
         />
 
-        {/* === PROTECTED STUDENT ROUTES === */}
         <Route 
           path="/profile" 
           element={
@@ -81,10 +83,38 @@ function App() {
 
         {/* === PROTECTED ADMIN ROUTES === */}
         <Route 
+          path="/admin" 
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <AdminDashboard />
+            </ProtectedRoute>
+          } 
+        />
+        
+        {/* Analytics & Results */}
+        <Route 
           path="/admin/results" 
           element={
             <ProtectedRoute requiredRole="admin">
               <AdminResults />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/admin/analytics" 
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <StudentProgress /> 
+            </ProtectedRoute>
+          } 
+        />
+        
+        {/* NEW: Student Details Route */}
+        <Route 
+          path="/admin/student/:id" 
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <StudentDetails />
             </ProtectedRoute>
           } 
         />
@@ -98,14 +128,7 @@ function App() {
           } 
         />
 
-        <Route 
-          path="/admin" 
-          element={
-            <ProtectedRoute requiredRole="admin">
-              <AdminDashboard />
-            </ProtectedRoute>
-          } 
-        />
+        {/* Course Management */}
         <Route 
           path="/admin/create-course" 
           element={
@@ -115,6 +138,16 @@ function App() {
           } 
         />
         <Route 
+          path="/admin/edit-course/:id" 
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <CreateCourse />
+            </ProtectedRoute>
+          } 
+        />
+        
+        {/* Assessment Management */}
+        <Route 
           path="/admin/create-test" 
           element={
             <ProtectedRoute requiredRole="admin">
@@ -122,14 +155,29 @@ function App() {
             </ProtectedRoute>
           } 
         />
-        <Route path="/admin/add-resource" element={<ProtectedRoute requiredRole="admin"><AddResource /></ProtectedRoute>} />
-        <Route path="/admin/edit-resource/:id" element={<ProtectedRoute requiredRole="admin"><AddResource /></ProtectedRoute>} />
-        {/* NEW: Edit Route (Re-uses CreateTest component) */}
         <Route 
           path="/admin/edit-test/:id" 
           element={
             <ProtectedRoute requiredRole="admin">
               <CreateTest />
+            </ProtectedRoute>
+          } 
+        />
+
+        {/* Resource Management */}
+        <Route 
+          path="/admin/add-resource" 
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <AddResource />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/admin/edit-resource/:id" 
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <AddResource />
             </ProtectedRoute>
           } 
         />

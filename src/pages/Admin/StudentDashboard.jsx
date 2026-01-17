@@ -1,65 +1,57 @@
-// src/pages/StudentDashboard.jsx
+// src/pages/Admin/StudentDashboard.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Mail, Clock, Calendar } from 'lucide-react';
+import { 
+    User, Mail, Clock, Calendar, BookOpen, 
+    TrendingUp, Award, PlayCircle, CheckCircle, 
+    ChevronRight, BarChart2, ChevronDown, ChevronUp, FileText,
+    Download // <--- Added Download
+} from 'lucide-react';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 const StudentDashboard = () => {
   const navigate = useNavigate();
   const [userData, setUserData] = useState(null);
-  const [history, setHistory] = useState([]);
+  const [enrollments, setEnrollments] = useState([]);
+  const [testHistory, setTestHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+  
+  const [expandedCourseId, setExpandedCourseId] = useState(null);
 
-  const [stats, setStats] = useState({ totalTests: 0, averageScore: 0, bestSubject: 'N/A' });
+  const [stats, setStats] = useState({
+      coursesInProgress: 0,
+      coursesCompleted: 0,
+      totalQuizzesTaken: 0,
+      avgScore: 0
+  });
 
   useEffect(() => {
     const fetchDashboardData = async () => {
-        // --- FIX 1: USE CORRECT KEY 'token' ---
         const token = localStorage.getItem('token');
-        
-        if (!token) {
-            navigate('/login');
-            return;
-        }
+        if (!token) { navigate('/login'); return; }
 
         try {
-            // --- FIX 2: FETCH USER DATA USING THE TOKEN ---
             const userRes = await fetch(`${API_BASE_URL}/users/me`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-
-            if (!userRes.ok) throw new Error("Failed to verify user session");
-            
             const user = await userRes.json();
-            setUserData(user); // 'user' object now contains _id, name, email
+            setUserData(user);
 
-            // --- FIX 3: USE REAL ID (user._id) TO GET RESULTS ---
+            const coursesRes = await fetch(`${API_BASE_URL}/courses/student/my-courses`, {
+                headers: { 'x-user-id': user._id, 'Authorization': `Bearer ${token}` }
+            });
+            const coursesData = coursesRes.ok ? await coursesRes.json() : [];
+            setEnrollments(coursesData);
+
             const resultsRes = await fetch(`${API_BASE_URL}/results/user/${user._id}`);
-            
-            if (!resultsRes.ok) {
-                 // Handle cases where history might be empty or server error
-                 if(resultsRes.status === 404) {
-                     setHistory([]);
-                     return;
-                 }
-                 throw new Error("Failed to load history");
-            }
-            
-            const historyData = await resultsRes.json();
-            
-            if (Array.isArray(historyData)) {
-                setHistory(historyData);
-                calculateStats(historyData);
-            } else {
-                setHistory([]); 
-            }
+            const resultsData = resultsRes.ok ? await resultsRes.json() : [];
+            setTestHistory(resultsData);
+
+            calculateUnifiedStats(coursesData, resultsData);
 
         } catch (err) {
-            console.error("Dashboard Error:", err);
-            // Don't show error if it's just a connection blip, maybe log it
-            setError(err.message);
+            console.error("Dashboard Load Error:", err);
         } finally {
             setIsLoading(false);
         }
@@ -68,114 +60,336 @@ const StudentDashboard = () => {
     fetchDashboardData();
   }, [navigate]);
 
-  const calculateStats = (data) => {
-    if (!data.length) return;
-    const total = data.length;
-    const avg = Math.round(data.reduce((acc, curr) => acc + curr.percentage, 0) / total);
-    
-    const categories = {};
-    data.forEach(item => {
-        const cat = item.category || 'General';
-        categories[cat] = (categories[cat] || 0) + 1;
-    });
-    
-    let bestSub = 'N/A';
-    if (Object.keys(categories).length > 0) {
-        bestSub = Object.keys(categories).reduce((a, b) => categories[a] > categories[b] ? a : b);
-    }
-    setStats({ totalTests: total, averageScore: avg, bestSubject: bestSub });
+  const calculateUnifiedStats = (courses, tests) => {
+      const completed = courses.filter(e => (e.courseProgress || 0) >= 100).length;
+      const inProgress = courses.length - completed;
+      let totalScores = 0;
+      let count = 0;
+      tests.forEach(t => { totalScores += t.percentage; count++; });
+      courses.forEach(c => {
+          if (c.quizScores) {
+              c.quizScores.forEach(q => { totalScores += q.percentage; count++; });
+          }
+      });
+      setStats({
+          coursesInProgress: inProgress,
+          coursesCompleted: completed,
+          totalQuizzesTaken: count,
+          avgScore: count > 0 ? Math.round(totalScores / count) : 0
+      });
   };
 
-  const formatDate = (dateString) => new Date(dateString).toLocaleDateString();
+  // --- NEW: EXPORT FUNCTION ---
+  const handleExport = () => {
+      const headers = ["Type,Item,Category,Details,Status,Date"];
+      const rows = [];
+
+      // 1. Courses
+      enrollments.forEach(e => {
+          rows.push(`"Course","${e.course.title}","${e.course.category}","Progress: ${e.courseProgress}%","${e.courseProgress >= 100 ? 'Completed' : 'In Progress'}","${new Date(e.lastActive).toLocaleDateString()}"`);
+      });
+
+      // 2. Standalone Assessments
+      testHistory.forEach(t => {
+           rows.push(`"Assessment","${t.testTitle}","${t.category || 'General'}","Score: ${t.score}/${t.totalQuestions} (${t.percentage}%)","${t.percentage >= 50 ? 'Passed' : 'Failed'}","${new Date(t.createdAt).toLocaleDateString()}"`);
+      });
+
+      // 3. Course Quizzes
+      enrollments.forEach(e => {
+          if(e.quizScores) {
+              e.quizScores.forEach(q => {
+                  rows.push(`"Course Quiz","${q.lessonTitle} (in ${e.course.title})","${e.course.category}","Score: ${q.score}/${q.totalQuestions} (${q.percentage}%)","${q.passed ? 'Passed' : 'Failed'}","${new Date(q.attemptedAt).toLocaleDateString()}"`);
+              });
+          }
+      });
+
+      if (rows.length === 0) return alert("No data to export.");
+
+      const csvContent = [headers, ...rows].join("\n");
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'my_learning_report.csv');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+  };
+
+  const getRecentActivity = () => {
+      const activities = [];
+      testHistory.forEach(t => {
+          activities.push({
+              id: t._id, type: 'Assessment', title: t.testTitle, category: t.category || 'General',
+              date: new Date(t.createdAt), score: t.score, total: t.totalQuestions, percentage: t.percentage, context: 'Standalone'
+          });
+      });
+      enrollments.forEach(e => {
+          if (e.quizScores) {
+              e.quizScores.forEach(q => {
+                  activities.push({
+                      id: `${e._id}-${q.lessonId}`, type: 'Course Quiz', title: q.lessonTitle, category: e.course.category,
+                      date: new Date(q.attemptedAt), score: q.score, total: q.totalQuestions, percentage: q.percentage, context: e.course.title
+                  });
+              });
+          }
+      });
+      return activities.sort((a, b) => b.date - a.date).slice(0, 5); 
+  };
 
   const getScoreColor = (percentage) => {
-    if (percentage >= 80) return "text-green-600 bg-green-50 border-green-200";
-    if (percentage >= 50) return "text-yellow-600 bg-yellow-50 border-yellow-200";
+    if (percentage >= 80) return "text-emerald-600 bg-emerald-50 border-emerald-200";
+    if (percentage >= 50) return "text-amber-600 bg-amber-50 border-amber-200";
     return "text-red-600 bg-red-50 border-red-200";
   };
 
-  if (isLoading) return <div className="min-h-screen flex items-center justify-center text-gray-500">Loading your dashboard...</div>;
-  if (error) return <div className="min-h-screen flex items-center justify-center text-red-500">Error: {error}</div>;
+  const toggleExpand = (id) => {
+      setExpandedCourseId(expandedCourseId === id ? null : id);
+  };
+
+  if (isLoading) return <div className="h-screen flex items-center justify-center bg-slate-50"><div className="animate-pulse text-slate-400 font-bold">Loading Dashboard...</div></div>;
+
+  const recentActivity = getRecentActivity();
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8 font-sans">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 mb-8 flex flex-col md:flex-row items-center gap-8">
-            <div className="w-24 h-24 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 border-4 border-white shadow-lg">
-                <User size={48} />
+    <div className="min-h-screen bg-slate-50 p-6 md:p-10 font-sans text-slate-800">
+      <div className="max-w-7xl mx-auto space-y-8">
+        
+        {/* === HEADER === */}
+        <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 flex flex-col md:flex-row items-center gap-8 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-purple-100 to-indigo-50 rounded-full blur-3xl opacity-50 -translate-y-1/2 translate-x-1/4"></div>
+            <div className="relative z-10 w-20 h-20 md:w-24 md:h-24 bg-slate-900 text-white rounded-2xl flex items-center justify-center shadow-xl shadow-purple-200">
+                <span className="text-3xl font-bold">{userData?.name?.charAt(0)}</span>
             </div>
-            <div className="text-center md:text-left flex-1">
-                <h1 className="text-3xl font-bold text-gray-900">{userData?.name || "Student"}</h1>
-                <div className="flex items-center justify-center md:justify-start gap-2 text-gray-500 mt-2">
-                    <Mail size={16} />
-                    <span>{userData?.email || "Loading email..."}</span>
+            <div className="text-center md:text-left flex-1 relative z-10">
+                <h1 className="text-3xl font-bold text-slate-900">Welcome back, {userData?.name}!</h1>
+                <div className="flex items-center justify-center md:justify-start gap-4 text-slate-500 mt-2 text-sm font-medium">
+                    <span className="flex items-center gap-1.5"><Mail size={14} /> {userData?.email}</span>
+                    <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+                    <span className="flex items-center gap-1.5"><Award size={14} /> Student</span>
                 </div>
             </div>
-            {/* Stats */}
-            <div className="flex gap-4">
-                <div className="text-center p-4 bg-indigo-50 rounded-2xl border border-indigo-100 min-w-[100px]">
-                    <div className="text-indigo-600 font-bold text-2xl">{stats.totalTests}</div>
-                    <div className="text-xs text-indigo-400 font-bold uppercase tracking-wider">Tests Taken</div>
+            
+            {/* Action Group */}
+            <div className="flex flex-col items-end gap-3 relative z-10">
+                <div className="flex gap-4">
+                    <div className="bg-white/50 backdrop-blur border border-slate-100 p-4 rounded-2xl text-center min-w-[100px]">
+                        <div className="text-2xl font-bold text-slate-800">{stats.coursesInProgress}</div>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Courses</div>
+                    </div>
+                    <div className="bg-white/50 backdrop-blur border border-slate-100 p-4 rounded-2xl text-center min-w-[100px]">
+                        <div className="text-2xl font-bold text-emerald-600">{stats.avgScore}%</div>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Avg Score</div>
+                    </div>
                 </div>
-                <div className="text-center p-4 bg-emerald-50 rounded-2xl border border-emerald-100 min-w-[100px]">
-                    <div className="text-emerald-600 font-bold text-2xl">{stats.averageScore}%</div>
-                    <div className="text-xs text-emerald-400 font-bold uppercase tracking-wider">Avg Score</div>
-                </div>
+                
+                {/* Export Button */}
+                <button 
+                    onClick={handleExport}
+                    className="flex items-center cursor-pointer gap-2 px-4 py-2 bg-white text-black hover:bg-black hover:text-white text-xs font-bold rounded-xl transition shadow-sm border border-slate-100"
+                >
+                    <Download size={14} /> Export My Report
+                </button>
             </div>
         </div>
 
-        {/* History Table */}
-        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-8 border-b border-gray-100 flex justify-between items-center">
-                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                    <Clock size={20} className="text-purple-500" />
-                    Recent Assessments
-                </h2>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            {/* === LEFT COL: MY COURSES === */}
+            <div className="lg:col-span-2 space-y-6">
+                <div className="flex justify-between items-end">
+                    <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                        <BookOpen size={20} className="text-purple-600" /> My Learning
+                    </h2>
+                    <button onClick={() => navigate('/courses')} className="text-xs font-bold text-purple-600 hover:text-purple-800 flex items-center gap-1">
+                        Browse Library <ChevronRight size={14} />
+                    </button>
+                </div>
+
+                {enrollments.length > 0 ? (
+                    <div className="flex flex-col gap-5">
+                        {enrollments.map(enrollment => {
+                            const isExpanded = expandedCourseId === enrollment._id;
+                            return (
+                                <div key={enrollment._id} className={`bg-white rounded-2xl border transition-all duration-300 overflow-hidden ${isExpanded ? 'border-purple-200 shadow-md' : 'border-slate-100 shadow-sm'}`}>
+                                    {/* Card Header */}
+                                    <div className="p-5 flex flex-col md:flex-row gap-5 items-start">
+                                        <div className="w-full md:w-20 h-20 rounded-xl bg-slate-100 overflow-hidden shrink-0">
+                                            {enrollment.course.thumbnail ? (
+                                                <img src={enrollment.course.thumbnail} alt="" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center bg-purple-100 text-purple-400"><BookOpen size={24} /></div>
+                                            )}
+                                        </div>
+                                        
+                                        <div className="flex-1 w-full">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{enrollment.course.category}</div>
+                                                    <h3 className="font-bold text-slate-900 text-lg mb-1">{enrollment.course.title}</h3>
+                                                </div>
+                                                <button onClick={() => toggleExpand(enrollment._id)} className="p-2 hover:bg-slate-50 rounded-full text-slate-400 transition-colors">
+                                                    {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                                                </button>
+                                            </div>
+
+                                            <div className="flex items-center gap-4 mt-2">
+                                                <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                                                    <div className={`h-full rounded-full ${enrollment.courseProgress >= 100 ? 'bg-emerald-500' : 'bg-purple-500'}`} style={{ width: `${enrollment.courseProgress}%` }} />
+                                                </div>
+                                                <span className="text-xs font-bold text-slate-600 min-w-[3rem] text-right">{enrollment.courseProgress}%</span>
+                                            </div>
+                                            
+                                            <div className="flex gap-3 mt-4">
+                                                <button 
+                                                    onClick={() => navigate(`/courses/${enrollment.course._id}/learn`)}
+                                                    className="flex-1 py-2 bg-slate-900 text-white hover:bg-purple-700 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-2"
+                                                >
+                                                    {enrollment.courseProgress >= 100 ? 'Review Course' : 'Continue Learning'} <PlayCircle size={14} />
+                                                </button>
+                                                <button 
+                                                    onClick={() => toggleExpand(enrollment._id)}
+                                                    className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold rounded-lg transition-colors"
+                                                >
+                                                    {isExpanded ? 'Hide Details' : 'View Details'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* EXPANDABLE DETAILS */}
+                                    {isExpanded && (
+                                        <div className="border-t border-slate-100 bg-slate-50/50 p-6 animate-in fade-in slide-in-from-top-2">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                                
+                                                {/* MODULE PROGRESS */}
+                                                <div>
+                                                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Module Progress</h4>
+                                                    <div className="space-y-3">
+                                                        {enrollment.moduleProgress && enrollment.moduleProgress.length > 0 ? (
+                                                            enrollment.moduleProgress.map((mod, i) => (
+                                                                <div key={i} className="bg-white p-3 rounded-lg border border-slate-100 shadow-sm">
+                                                                    <div className="flex justify-between text-xs font-bold text-slate-700 mb-1.5">
+                                                                        <span>{mod.moduleTitle}</span>
+                                                                        <span className={mod.percentage >= 100 ? "text-emerald-600" : "text-slate-500"}>{mod.percentage}%</span>
+                                                                    </div>
+                                                                    <div className="w-full bg-slate-100 rounded-full h-1.5">
+                                                                        <div className={`h-full rounded-full transition-all ${mod.percentage >= 100 ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ width: `${mod.percentage}%` }} />
+                                                                    </div>
+                                                                </div>
+                                                            ))
+                                                        ) : (
+                                                            <div className="text-xs text-slate-400 italic">No module data available.</div>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* QUIZ SCORES */}
+                                                <div>
+                                                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Quiz Performance</h4>
+                                                    <div className="space-y-2">
+                                                        {enrollment.quizScores && enrollment.quizScores.length > 0 ? (
+                                                            enrollment.quizScores.map((quiz, i) => (
+                                                                <div key={i} className="flex justify-between items-center p-2 rounded hover:bg-white transition-colors">
+                                                                    <div className="flex items-center gap-2 overflow-hidden">
+                                                                        <div className={`w-2 h-2 rounded-full shrink-0 ${quiz.passed ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                                                                        <span className="text-xs font-medium text-slate-700 truncate" title={quiz.lessonTitle}>{quiz.lessonTitle}</span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-3 shrink-0">
+                                                                        <span className="text-xs text-slate-400">{quiz.score}/{quiz.totalQuestions}</span>
+                                                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${getScoreColor(quiz.percentage)}`}>
+                                                                            {quiz.percentage}%
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            ))
+                                                        ) : (
+                                                            <div className="text-xs text-slate-400 italic p-2 border border-dashed border-slate-200 rounded">No quizzes taken yet.</div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                ) : (
+                    <div className="bg-white p-12 rounded-2xl border border-dashed border-slate-300 text-center">
+                        <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-400"><BookOpen size={32} /></div>
+                        <h3 className="text-slate-800 font-bold mb-2">No courses yet</h3>
+                        <p className="text-slate-500 text-sm mb-6">Start your learning journey today.</p>
+                        <button onClick={() => navigate('/courses')} className="px-6 py-2 bg-purple-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-purple-200 hover:bg-purple-700 transition">Explore Catalog</button>
+                    </div>
+                )}
             </div>
 
-            {history.length === 0 ? (
-                 <div className="p-12 text-center text-gray-400">No assessments taken yet. Go take a quiz!</div>
-            ) : (
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                        <thead className="bg-gray-50/50 text-gray-500 text-xs uppercase tracking-wider font-semibold">
-                            <tr>
-                                <th className="p-6">Assessment</th>
-                                <th className="p-6">Category</th>
-                                <th className="p-6">Date</th>
-                                <th className="p-6">Score</th>
-                                <th className="p-6">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {history.map((item) => (
-                                <tr key={item._id} className="hover:bg-gray-50 transition-colors">
-                                    <td className="p-6 font-medium text-gray-800">{item.testTitle}</td>
-                                    <td className="p-6">
-                                        <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs font-bold uppercase">
-                                            {item.category || 'General'}
-                                        </span>
-                                    </td>
-                                    <td className="p-6 text-gray-500 text-sm flex items-center gap-2">
-                                        <Calendar size={14} />
-                                        {formatDate(item.createdAt)}
-                                    </td>
-                                    <td className="p-6">
-                                        <span className="text-lg font-bold text-gray-900">{item.score}</span>
-                                        <span className="text-gray-400 text-sm">/ {item.totalQuestions}</span>
-                                    </td>
-                                    <td className="p-6">
-                                        <span className={`px-4 py-1.5 rounded-lg text-xs font-bold border ${getScoreColor(item.percentage)}`}>
-                                            {item.percentage}%
-                                        </span>
-                                    </td>
-                                </tr>
+            {/* === RIGHT COL: PERFORMANCE === */}
+            <div className="space-y-6">
+                <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                    <TrendingUp size={20} className="text-emerald-500" /> Recent Activity
+                </h2>
+                
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                    {recentActivity.length > 0 ? (
+                        <div className="divide-y divide-slate-50">
+                            {recentActivity.map((activity, idx) => (
+                                <div key={idx} className="p-4 hover:bg-slate-50 transition-colors">
+                                    <div className="flex justify-between items-start mb-1">
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wide ${activity.type === 'Assessment' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-purple-50 text-purple-600 border-purple-100'}`}>
+                                                    {activity.type}
+                                                </span>
+                                                <span className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
+                                                    <Calendar size={10} /> {activity.date.toLocaleDateString()}
+                                                </span>
+                                            </div>
+                                            <h4 className="font-bold text-slate-800 text-sm">{activity.title}</h4>
+                                            {activity.context !== 'Standalone' && (
+                                                <p className="text-xs text-slate-400 mt-0.5">in {activity.context}</p>
+                                            )}
+                                        </div>
+                                        <div className={`px-2 py-1 rounded-md text-xs font-bold border ${getScoreColor(activity.percentage)}`}>
+                                            {activity.percentage}%
+                                        </div>
+                                    </div>
+                                </div>
                             ))}
-                        </tbody>
-                    </table>
+                        </div>
+                    ) : (
+                        <div className="p-8 text-center text-slate-400 text-sm">
+                            No quiz activity recorded yet.
+                        </div>
+                    )}
                 </div>
-            )}
+
+                {/* Performance Summary Card (Light Theme) */}
+                <div className="bg-white rounded-2xl p-6 shadow-xl border border-slate-100 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-purple-100 rounded-full blur-2xl opacity-50 -mr-10 -mt-10"></div>
+                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-slate-900">
+                        <BarChart2 size={18} className="text-purple-600" /> Statistics
+                    </h3>
+                    <div className="space-y-4 relative z-10">
+                        <div className="flex justify-between items-center">
+                            <span className="text-slate-500 text-sm font-medium">Total Quizzes</span>
+                            <span className="font-bold text-slate-800">{stats.totalQuizzesTaken}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-slate-500 text-sm font-medium">Courses Completed</span>
+                            <span className="font-bold text-emerald-600">{stats.coursesCompleted}</span>
+                        </div>
+                        <div className="w-full bg-slate-100 rounded-full h-1 mt-2">
+                            <div className="bg-purple-500 h-full rounded-full" style={{ width: `${stats.avgScore}%` }}></div>
+                        </div>
+                        <div className="text-center text-xs text-slate-500 mt-2">
+                            You are averaging <span className="text-slate-900 font-bold">{stats.avgScore}%</span> across all assessments.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
       </div>
     </div>

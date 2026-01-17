@@ -1,7 +1,7 @@
 // src/pages/Courses/CourseCatalog.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, BookOpen, Clock, User, Lock, PlayCircle, CheckCircle, AlertCircle } from 'lucide-react';
+import { Search, BookOpen, Clock, User, Lock, PlayCircle, CheckCircle, AlertCircle, Globe } from 'lucide-react';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -71,9 +71,17 @@ const CourseCatalog = () => {
         });
 
         if (res.ok) {
-            // Optimistic Update: Set status to pending immediately
-            setEnrollmentMap({ ...enrollmentMap, [courseId]: 'pending' });
-            alert("Request Sent! Waiting for Admin approval.");
+            const data = await res.json();
+            
+            // Update map with the actual status returned (approved or pending)
+            setEnrollmentMap(prev => ({ ...prev, [courseId]: data.status }));
+
+            if (data.status === 'approved') {
+                alert("Enrolled Successfully! You can start learning immediately.");
+                navigate(`/courses/${courseId}/learn`);
+            } else {
+                alert("Request Sent! Waiting for Admin approval.");
+            }
         } else {
             const err = await res.json();
             alert(err.message);
@@ -117,7 +125,21 @@ const CourseCatalog = () => {
             </button>
           );
       } else {
-          // Not enrolled yet
+          // --- NOT ENROLLED YET ---
+          
+          // Check if Public
+          if (course.isPublic) {
+              return (
+                <button 
+                    onClick={() => handleEnroll(course._id)}
+                    className="w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200"
+                >
+                    Start Learning <Globe size={16} />
+                </button>
+              );
+          }
+
+          // Private Course
           return (
             <button 
                 onClick={() => handleEnroll(course._id)}
@@ -167,6 +189,13 @@ const CourseCatalog = () => {
                             <div className="absolute top-4 right-4 bg-white/90 backdrop-blur text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide text-slate-800 shadow-sm">
                                 {course.difficulty}
                             </div>
+                            
+                            {/* Public Badge overlay */}
+                            {course.isPublic && (
+                                <div className="absolute top-4 left-4 bg-indigo-500/90 backdrop-blur text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 shadow-sm">
+                                    <Globe size={12} /> Public
+                                </div>
+                            )}
                         </div>
                         
                         <div className="p-6 flex-1 flex flex-col">
