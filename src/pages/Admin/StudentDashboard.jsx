@@ -5,7 +5,7 @@ import {
     User, Mail, Clock, Calendar, BookOpen, 
     TrendingUp, Award, PlayCircle, CheckCircle, 
     ChevronRight, BarChart2, ChevronDown, ChevronUp, FileText,
-    Download // <--- Added Download
+    Download, Eye // <--- Added Eye Icon
 } from 'lucide-react';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -79,7 +79,6 @@ const StudentDashboard = () => {
       });
   };
 
-  // --- NEW: EXPORT FUNCTION ---
   const handleExport = () => {
       const headers = ["Type,Item,Category,Details,Status,Date"];
       const rows = [];
@@ -116,20 +115,61 @@ const StudentDashboard = () => {
       document.body.removeChild(link);
   };
 
+  // --- NAVIGATION HELPERS ---
+  const handleViewQuiz = (quizData, courseId, courseTitle) => {
+      navigate('/admin/quiz-result', {
+          state: {
+              quizData: quizData,
+              courseId: courseId,
+              courseTitle: courseTitle,
+              studentName: userData?.name // Pass current user name
+          }
+      });
+  };
+
+  const handleViewTest = (resultData) => {
+      navigate('/admin/test-result', {
+          state: {
+              resultData: resultData,
+              studentName: userData?.name
+          }
+      });
+  };
+
   const getRecentActivity = () => {
       const activities = [];
       testHistory.forEach(t => {
           activities.push({
-              id: t._id, type: 'Assessment', title: t.testTitle, category: t.category || 'General',
-              date: new Date(t.createdAt), score: t.score, total: t.totalQuestions, percentage: t.percentage, context: 'Standalone'
+              id: t._id, 
+              type: 'Assessment', 
+              title: t.testTitle, 
+              category: t.category || 'General',
+              date: new Date(t.createdAt), 
+              score: t.score, 
+              total: t.totalQuestions, 
+              percentage: t.percentage, 
+              context: 'Standalone',
+              // Data for nav
+              rawResultData: t 
           });
       });
       enrollments.forEach(e => {
           if (e.quizScores) {
               e.quizScores.forEach(q => {
                   activities.push({
-                      id: `${e._id}-${q.lessonId}`, type: 'Course Quiz', title: q.lessonTitle, category: e.course.category,
-                      date: new Date(q.attemptedAt), score: q.score, total: q.totalQuestions, percentage: q.percentage, context: e.course.title
+                      id: `${e._id}-${q.lessonId}`, 
+                      type: 'Course Quiz', 
+                      title: q.lessonTitle, 
+                      category: e.course.category,
+                      date: new Date(q.attemptedAt), 
+                      score: q.score, 
+                      total: q.totalQuestions, 
+                      percentage: q.percentage, 
+                      context: e.course.title,
+                      // Data for nav
+                      rawQuizData: q,
+                      courseId: e.course._id,
+                      courseTitle: e.course.title
                   });
               });
           }
@@ -290,16 +330,21 @@ const StudentDashboard = () => {
                                                     <div className="space-y-2">
                                                         {enrollment.quizScores && enrollment.quizScores.length > 0 ? (
                                                             enrollment.quizScores.map((quiz, i) => (
-                                                                <div key={i} className="flex justify-between items-center p-2 rounded hover:bg-white transition-colors">
+                                                                <div 
+                                                                    key={i} 
+                                                                    onClick={() => handleViewQuiz(quiz, enrollment.course._id, enrollment.course.title)}
+                                                                    className="flex justify-between items-center p-2 rounded hover:bg-white transition-colors cursor-pointer group"
+                                                                >
                                                                     <div className="flex items-center gap-2 overflow-hidden">
                                                                         <div className={`w-2 h-2 rounded-full shrink-0 ${quiz.passed ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                                                                        <span className="text-xs font-medium text-slate-700 truncate" title={quiz.lessonTitle}>{quiz.lessonTitle}</span>
+                                                                        <span className="text-xs font-medium text-slate-700 truncate group-hover:text-purple-700" title={quiz.lessonTitle}>{quiz.lessonTitle}</span>
                                                                     </div>
                                                                     <div className="flex items-center gap-3 shrink-0">
                                                                         <span className="text-xs text-slate-400">{quiz.score}/{quiz.totalQuestions}</span>
                                                                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${getScoreColor(quiz.percentage)}`}>
                                                                             {quiz.percentage}%
                                                                         </span>
+                                                                        <Eye size={12} className="text-slate-300 group-hover:text-purple-500" />
                                                                     </div>
                                                                 </div>
                                                             ))
@@ -335,7 +380,14 @@ const StudentDashboard = () => {
                     {recentActivity.length > 0 ? (
                         <div className="divide-y divide-slate-50">
                             {recentActivity.map((activity, idx) => (
-                                <div key={idx} className="p-4 hover:bg-slate-50 transition-colors">
+                                <div 
+                                    key={idx} 
+                                    onClick={() => {
+                                        if (activity.type === 'Course Quiz') handleViewQuiz(activity.rawQuizData, activity.courseId, activity.courseTitle);
+                                        if (activity.type === 'Assessment') handleViewTest(activity.rawResultData);
+                                    }}
+                                    className="p-4 hover:bg-slate-50 transition-colors cursor-pointer group"
+                                >
                                     <div className="flex justify-between items-start mb-1">
                                         <div>
                                             <div className="flex items-center gap-2 mb-1">
@@ -346,13 +398,16 @@ const StudentDashboard = () => {
                                                     <Calendar size={10} /> {activity.date.toLocaleDateString()}
                                                 </span>
                                             </div>
-                                            <h4 className="font-bold text-slate-800 text-sm">{activity.title}</h4>
+                                            <h4 className="font-bold text-slate-800 text-sm group-hover:text-purple-700 transition-colors">{activity.title}</h4>
                                             {activity.context !== 'Standalone' && (
                                                 <p className="text-xs text-slate-400 mt-0.5">in {activity.context}</p>
                                             )}
                                         </div>
-                                        <div className={`px-2 py-1 rounded-md text-xs font-bold border ${getScoreColor(activity.percentage)}`}>
-                                            {activity.percentage}%
+                                        <div className="flex flex-col items-end gap-1">
+                                            <div className={`px-2 py-1 rounded-md text-xs font-bold border ${getScoreColor(activity.percentage)}`}>
+                                                {activity.percentage}%
+                                            </div>
+                                            <Eye size={12} className="text-slate-300 group-hover:text-purple-500" />
                                         </div>
                                     </div>
                                 </div>

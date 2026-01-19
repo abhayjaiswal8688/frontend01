@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { 
     PlayCircle, FileText, Lock, Menu, ChevronLeft, ChevronRight, 
     CheckCircle, Trophy, Circle, HelpCircle, Clock, AlertTriangle, 
-    Maximize, Minimize, Square, CheckSquare 
+    Maximize, Minimize, Square, CheckSquare, MessageSquare 
 } from 'lucide-react';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -19,7 +19,7 @@ const CoursePlayer = () => {
   
   // State for tracking
   const [completedLessons, setCompletedLessons] = useState([]); 
-  const [courseProgress, setCourseProgress] = useState(0); // Store overall % locally
+  const [courseProgress, setCourseProgress] = useState(0); 
   
   const [activeModuleIndex, setActiveModuleIndex] = useState(0);
   const [activeLessonIndex, setActiveLessonIndex] = useState(0);
@@ -30,10 +30,11 @@ const CoursePlayer = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const playerContainerRef = useRef(null);
 
-  // --- QUIZ STATE ---
+  // --- QUIZ STATE (Updated) ---
   const [quizState, setQuizState] = useState({ 
       currentIndex: 0, 
-      answers: {}, 
+      answers: {},        // { 0: [1], 1: [0, 2] } -> Stores indices
+      reasoning: {},      // { 0: "Because X...", 1: "Reason Y..." } -> Stores text
       score: null, 
       showResult: false 
   });
@@ -72,7 +73,7 @@ const CoursePlayer = () => {
 
   // --- RESET STATE ON LESSON CHANGE ---
   useEffect(() => {
-    setQuizState({ currentIndex: 0, answers: {}, score: null, showResult: false });
+    setQuizState({ currentIndex: 0, answers: {}, reasoning: {}, score: null, showResult: false });
     const currentLesson = course?.modules[activeModuleIndex]?.lessons[activeLessonIndex];
     if (currentLesson?.type === 'quiz') {
         const seconds = parseDurationToSeconds(currentLesson.duration || "10 mins");
@@ -145,7 +146,7 @@ const CoursePlayer = () => {
     }
   };
 
-  // --- UPDATED: SAVE PROGRESS (Generic) ---
+  // --- SAVE PROGRESS (Generic) ---
   const saveProgressToBackend = async (lessonId, moduleId, type, quizData = null) => {
       const token = localStorage.getItem('token');
       const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -162,35 +163,27 @@ const CoursePlayer = () => {
                   lessonId, 
                   moduleId,
                   type,
-                  quizData // Optional: { score, totalQuestions, passed }
+                  quizData 
               })
           });
 
           if (res.ok) {
               const data = await res.json();
-              setCompletedLessons(data.progress); // Update local list
-              setCourseProgress(data.courseProgress); // Update local %
+              setCompletedLessons(data.progress); 
+              setCourseProgress(data.courseProgress); 
           }
       } catch (err) {
           console.error("Failed to save progress", err);
       }
   };
 
-  // --- UPDATED: HANDLE LESSON COMPLETION (Video/Text) ---
+  // --- HANDLE LESSON COMPLETION ---
   const handleMarkComplete = async () => {
       const currentModule = course.modules[activeModuleIndex];
       const currentLesson = currentModule.lessons[activeLessonIndex];
       const isCurrentlyCompleted = completedLessons.includes(currentLesson._id);
 
-      // Optimistic UI Update (Toggle)
-      if (isCurrentlyCompleted) {
-          // If unmarking, we need logic to remove it. 
-          // For simplicity, let's assume this button currently only MARKS as complete in this new system
-          // or we can add an 'unmark' flag to the backend if needed. 
-          // Current backend implementation mainly ADDS progress. 
-          // We will focus on marking complete for now.
-          return; 
-      }
+      if (isCurrentlyCompleted) return; 
 
       await saveProgressToBackend(currentLesson._id, currentModule._id, currentLesson.type);
   };
@@ -217,6 +210,7 @@ const CoursePlayer = () => {
       }
   };
 
+  // --- QUIZ HANDLERS ---
   const handleQuizOptionSelect = (optionIdx) => {
       const currentLesson = course.modules[activeModuleIndex].lessons[activeLessonIndex];
       const currentQuestion = currentLesson.questions[quizState.currentIndex];
@@ -238,14 +232,25 @@ const CoursePlayer = () => {
       });
   };
 
-  // --- UPDATED: SUBMIT QUIZ ---
+  const handleReasoningChange = (e) => {
+      const val = e.target.value;
+      setQuizState(prev => ({
+          ...prev,
+          reasoning: { ...prev.reasoning, [prev.currentIndex]: val }
+      }));
+  };
+
+  // --- UPDATED: SUBMIT QUIZ WITH DETAILS ---
   const submitQuiz = async () => {
       const currentModule = course.modules[activeModuleIndex];
       const currentLesson = currentModule.lessons[activeLessonIndex];
       let correctCount = 0;
       
-      currentLesson.questions.forEach((q, idx) => {
+      // 1. Calculate Results and Build Response Data
+      const responses = currentLesson.questions.map((q, idx) => {
           const userAnswers = quizState.answers[idx] || [];
+          const userReasoning = quizState.reasoning[idx] || "";
+          
           const correctIndices = q.correctOptionIndices && q.correctOptionIndices.length > 0 
               ? q.correctOptionIndices 
               : [q.correctOptionIndex]; 
@@ -257,6 +262,13 @@ const CoursePlayer = () => {
               sortedUser.every((val, i) => val === sortedCorrect[i]);
           
           if (isCorrect) correctCount++;
+
+          return {
+              questionText: q.questionText,
+              selectedOptionIndices: userAnswers,
+              reasoning: userReasoning,
+              isCorrect: isCorrect
+          };
       });
 
       setQuizState(prev => ({ ...prev, score: correctCount, showResult: true }));
@@ -264,7 +276,7 @@ const CoursePlayer = () => {
       
       const passed = (correctCount / currentLesson.questions.length) >= 0.5;
 
-      // Send detailed score to backend
+      // 2. Send detailed data to backend
       await saveProgressToBackend(
           currentLesson._id, 
           currentModule._id, 
@@ -272,7 +284,8 @@ const CoursePlayer = () => {
           { 
               score: correctCount, 
               totalQuestions: currentLesson.questions.length, 
-              passed 
+              passed,
+              responses // <--- Sending detailed responses
           }
       );
   };
@@ -285,13 +298,13 @@ const CoursePlayer = () => {
   const currentLesson = currentModule?.lessons[activeLessonIndex];
   const isLessonCompleted = completedLessons.includes(currentLesson?._id);
 
-  // Use the progress from backend or calculate if needed, but backend is source of truth now
-  // For the sidebar visual, we use the backend's `courseProgress`
-  
+  // --- CURRENT QUESTION HELPERS ---
+  const currentQuestion = currentLesson?.type === 'quiz' ? currentLesson.questions[quizState.currentIndex] : null;
+
   return (
     <div className="h-screen flex flex-col md:flex-row bg-slate-50 font-sans overflow-hidden">
         
-        {/* === SIDEBAR === */}
+        {/* === SIDEBAR (Unchanged) === */}
         {!isFullscreen && (
             <div 
                 className={`
@@ -300,6 +313,7 @@ const CoursePlayer = () => {
                     h-full z-30 shadow-xl md:shadow-none absolute md:relative
                 `}
             >
+                {/* ... Sidebar Header ... */}
                 <div className="p-5 border-b border-slate-100 bg-white min-w-[20rem]">
                     <div className="flex justify-between items-start mb-4">
                         <h3 className="font-bold text-slate-800 leading-tight pr-2">{course.title}</h3>
@@ -314,6 +328,7 @@ const CoursePlayer = () => {
                     </div>
                 </div>
                 
+                {/* ... Sidebar Modules List ... */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-6 min-w-[20rem] scrollbar-thin scrollbar-thumb-slate-200">
                     {course.modules.map((module, mIndex) => (
                         <div key={mIndex}>
@@ -432,12 +447,11 @@ const CoursePlayer = () => {
                                     </p>
                                     <div className="flex gap-4">
                                         <button 
-                                            onClick={() => setQuizState(prev => ({ ...prev, showResult: false, currentIndex: 0, score: null, answers: {} }))}
+                                            onClick={() => setQuizState(prev => ({ ...prev, showResult: false, currentIndex: 0, score: null, answers: {}, reasoning: {} }))}
                                             className="px-8 py-3 bg-white border-2 border-slate-200 rounded-xl font-bold text-slate-700 hover:border-slate-300 hover:bg-slate-50 transition-all"
                                         >
                                             Retry Quiz
                                         </button>
-                                        {/* Continue Button just moves next, completion handled by submit */}
                                         <button 
                                             onClick={handleNext}
                                             className="px-8 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-purple-600 transition-all shadow-lg hover:shadow-purple-500/20"
@@ -464,17 +478,17 @@ const CoursePlayer = () => {
                                     </div>
                                     
                                     <h2 className="text-2xl md:text-3xl font-bold text-slate-800 mb-8 leading-snug">
-                                        {currentLesson.questions[quizState.currentIndex].questionText}
-                                        {currentLesson.questions[quizState.currentIndex].type === 'multiple' && (
+                                        {currentQuestion.questionText}
+                                        {currentQuestion.type === 'multiple' && (
                                             <span className="block text-sm font-normal text-slate-500 mt-2">(Select all that apply)</span>
                                         )}
                                     </h2>
                                     
-                                    <div className="space-y-4 mb-10">
-                                        {currentLesson.questions[quizState.currentIndex].options.map((opt, idx) => {
+                                    <div className="space-y-4 mb-8">
+                                        {currentQuestion.options.map((opt, idx) => {
                                             const currentAnswers = quizState.answers[quizState.currentIndex] || [];
                                             const isSelected = currentAnswers.includes(idx);
-                                            const isMultiple = currentLesson.questions[quizState.currentIndex].type === 'multiple';
+                                            const isMultiple = currentQuestion.type === 'multiple';
 
                                             return (
                                                 <div 
@@ -504,6 +518,23 @@ const CoursePlayer = () => {
                                             );
                                         })}
                                     </div>
+                                    
+                                    {/* REASONING FIELD (Dynamic) */}
+                                    {currentQuestion.requiresReasoning && (
+                                        <div className="mb-8 animate-in fade-in slide-in-from-bottom-2">
+                                            <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                                                <MessageSquare size={16} className="text-purple-600" />
+                                                Why did you choose this answer? <span className="text-slate-400 font-normal">(Required)</span>
+                                            </label>
+                                            <textarea 
+                                                value={quizState.reasoning[quizState.currentIndex] || ""}
+                                                onChange={handleReasoningChange}
+                                                className="w-full p-4 border-2 border-slate-200 rounded-xl outline-none focus:border-purple-400 focus:ring-4 focus:ring-purple-50 transition-all text-slate-700"
+                                                placeholder="Type your reasoning here..."
+                                                rows={3}
+                                            />
+                                        </div>
+                                    )}
                                     
                                     <div className="flex justify-between items-center pt-6 border-t border-slate-100">
                                         <button 

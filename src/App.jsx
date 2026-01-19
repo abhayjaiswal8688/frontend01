@@ -27,7 +27,9 @@ import CourseCatalog from './pages/Courses/CourseCatalog';
 import CoursePlayer from './pages/Courses/CoursePlayer';
 import AdminEnrollments from './pages/Admin/AdminEnrollments';
 import StudentProgress from './pages/Admin/StudentProgress'; 
-import StudentDetails from './pages/Admin/StudentDetails'; // <--- NEW IMPORT
+import StudentDetails from './pages/Admin/StudentDetails';
+import QuizResultDetails from './pages/Admin/QuizResultDetails'; 
+import TestResultDetails from './pages/Admin/TestResultDetails'; // <--- NEW IMPORT
 
 function App() {
 
@@ -109,12 +111,32 @@ function App() {
           } 
         />
         
-        {/* NEW: Student Details Route */}
+        {/* Student Details Route */}
         <Route 
           path="/admin/student/:id" 
           element={
             <ProtectedRoute requiredRole="admin">
               <StudentDetails />
+            </ProtectedRoute>
+          } 
+        />
+
+        {/* Quiz Result Details Route (Course) */}
+        <Route 
+          path="/admin/quiz-result" 
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <QuizResultDetails />
+            </ProtectedRoute>
+          } 
+        />
+
+        {/* NEW: Test Result Details Route (Assessments) */}
+        <Route 
+          path="/admin/test-result" 
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <TestResultDetails />
             </ProtectedRoute>
           } 
         />

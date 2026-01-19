@@ -32,7 +32,8 @@ const AdminResults = () => {
       }
 
       try {
-        const res = await fetch(`${API_BASE_URL}/results/admin/all`, {
+        // UPDATED: Changed endpoint to match results.js (router.get('/'))
+        const res = await fetch(`${API_BASE_URL}/results`, {
              headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -227,7 +228,6 @@ const AdminResults = () => {
                                     className={`w-full text-left px-4 py-3 text-sm flex items-center gap-3 transition-colors border-b border-slate-50 last:border-0 
                                         ${i === activeSuggestion ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-700'}
                                     `}
-                                    // Use onMouseDown instead of onClick to fire before Input Blur
                                     onMouseDown={() => selectSuggestion(s, setSearchTerm, () => setShowGeneralSuggestions(false))}
                                 >
                                     <Search size={14} className={i === activeSuggestion ? "text-blue-500" : "text-slate-400"} />
@@ -304,17 +304,33 @@ const AdminResults = () => {
                         <tbody className="divide-y divide-slate-50">
                             {filteredResults.map((result) => (
                                 <tr key={result._id} className="hover:bg-slate-50/80 transition-colors">
+                                    
+                                    {/* --- CLICKABLE STUDENT PROFILE --- */}
                                     <td className="p-5">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-600 flex items-center justify-center font-bold text-sm shadow-sm">
+                                        <div 
+                                            onClick={() => {
+                                                // Only navigate if we have a valid User ID
+                                                if (result.userId?._id) {
+                                                    navigate(`/admin/student/${result.userId._id}`, {
+                                                        state: { student: { name: result.userId.name, email: result.userId.email } }
+                                                    });
+                                                }
+                                            }}
+                                            className="flex items-center gap-3 cursor-pointer group"
+                                        >
+                                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-600 flex items-center justify-center font-bold text-sm shadow-sm transition-transform group-hover:scale-110">
                                                 {result.userId?.name ? result.userId.name.charAt(0).toUpperCase() : <User size={16} />}
                                             </div>
                                             <div>
-                                                <div className="font-bold text-slate-800">{result.userId?.name || "Unknown User"}</div>
+                                                <div className="font-bold text-slate-800 group-hover:text-blue-600 transition-colors flex items-center gap-1">
+                                                    {result.userId?.name || "Unknown User"}
+                                                    <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity -ml-2 group-hover:ml-0 text-blue-400" />
+                                                </div>
                                                 <div className="text-xs text-slate-500 font-medium">{result.userId?.email || "No Email"}</div>
                                             </div>
                                         </div>
                                     </td>
+
                                     <td className="p-5">
                                         <div className="font-semibold text-slate-800">{result.testTitle}</div>
                                         <span className="inline-flex items-center gap-1 mt-1 px-2.5 py-0.5 rounded-full text-[10px] bg-slate-100 text-slate-600 uppercase font-bold tracking-wide border border-slate-200">

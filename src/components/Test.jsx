@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
     Search, Clock, HelpCircle, ArrowRight, CheckCircle, RotateCcw, 
     LayoutDashboard, X, ChevronLeft, ChevronRight, Trophy, AlertTriangle, 
-    Maximize, Minimize, Sparkles, Check 
+    Maximize, Minimize, Sparkles, Check, MessageSquare 
 } from 'lucide-react';
 
 // Define the API URL based on the environment
@@ -18,6 +18,7 @@ const Test = () => {
   // Quiz State
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [userAnswers, setUserAnswers] = useState({});
+  const [userReasoning, setUserReasoning] = useState({}); // NEW: Track reasoning
   const [showResult, setShowResult] = useState(false);
   const [score, setScore] = useState(0);
 
@@ -112,6 +113,7 @@ const Test = () => {
 
         setCurrentQuestionIndex(0);
         setUserAnswers({});
+        setUserReasoning({}); // Reset reasoning
         setShowResult(false);
         setScore(0);
       }
@@ -146,6 +148,15 @@ const Test = () => {
           }
       });
   };
+
+  // NEW: Handle Reasoning Input
+  const handleReasoningChange = (e) => {
+      const val = e.target.value;
+      setUserReasoning(prev => ({
+          ...prev,
+          [currentQuestionIndex]: val
+      }));
+  };
   
   const handleNext = () => {
     if (currentQuestionIndex < activeTest.questions.length - 1) setCurrentQuestionIndex(currentQuestionIndex + 1);
@@ -156,7 +167,8 @@ const Test = () => {
     if (currentQuestionIndex > 0) setCurrentQuestionIndex(currentQuestionIndex - 1);
   };
   
-  const saveResultToDB = async (finalScore) => {
+  // UPDATED: Save detailed result including responses
+  const saveResultToDB = async (finalScore, responses) => {
     if (!activeTest) return;
 
     try {
@@ -177,7 +189,9 @@ const Test = () => {
             testTitle: activeTest.title,
             category: activeTest.category || 'General',
             score: finalScore,
-            totalQuestions: activeTest.questions.length
+            totalQuestions: activeTest.questions.length,
+            percentage: (finalScore / activeTest.questions.length) * 100, // Added Percentage
+            responses: responses // Added Detailed Responses
         };
 
         await fetch(`${API_BASE_URL}/results`, {
@@ -190,29 +204,50 @@ const Test = () => {
     }
   };
 
+  // UPDATED: Build response objects
   const calculateScore = () => {
     let newScore = 0;
-    activeTest.questions.forEach((question, index) => {
+    
+    // Build the responses array for the database
+    const responses = activeTest.questions.map((question, index) => {
       const userAnswer = userAnswers[index];
+      const reasoning = userReasoning[index] || "";
       const correctIndices = question.correctOptionIndices || [question.correctOptionIndex];
+      
+      // Normalize user answer to array for consistent storage
+      let selectedIndices = [];
+      if (Array.isArray(userAnswer)) selectedIndices = userAnswer;
+      else if (userAnswer !== undefined) selectedIndices = [userAnswer];
 
+      // Calculate Correctness
+      let isCorrect = false;
       if (question.type === 'multiple') {
-          const userSelected = Array.isArray(userAnswer) ? userAnswer : [];
-          const sortedUser = [...userSelected].sort();
+          const sortedUser = [...selectedIndices].sort();
           const sortedCorrect = [...correctIndices].sort();
           
           if (JSON.stringify(sortedUser) === JSON.stringify(sortedCorrect)) {
-              newScore += 1;
+              isCorrect = true;
           }
       } else {
-          if (userAnswer === correctIndices[0]) {
-              newScore += 1;
+          // Single choice
+          if (selectedIndices.length > 0 && selectedIndices[0] === correctIndices[0]) {
+              isCorrect = true;
           }
       }
+
+      if (isCorrect) newScore += 1;
+
+      return {
+          questionText: question.questionText,
+          selectedOptionIndices: selectedIndices,
+          reasoning: reasoning,
+          isCorrect: isCorrect
+      };
     });
+
     setScore(newScore);
     setShowResult(true);
-    saveResultToDB(newScore); 
+    saveResultToDB(newScore, responses); 
   };
 
   const getIcon = (iconName) => {
@@ -353,7 +388,7 @@ const Test = () => {
                     </div>
                 )}
 
-                {/* CONTENT AREA (REMOVED justify-center to fix overlap) */}
+                {/* CONTENT AREA */}
                 <div className={`p-8 md:p-10 flex-1 overflow-y-auto ${isFullscreen ? 'max-w-5xl mx-auto w-full' : ''}`}>
                   {showResult ? (
                     <div className="text-center py-6">
@@ -383,7 +418,7 @@ const Test = () => {
 
                       <div className="flex flex-col sm:flex-row justify-center gap-4">
                           <button onClick={handleBackToList} className="flex items-center justify-center gap-2 px-8 py-3.5 border-2 border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-white hover:border-slate-300 transition-all"><LayoutDashboard size={18} /> Dashboard</button>
-                          <button onClick={() => { setShowResult(false); setCurrentQuestionIndex(0); setScore(0); setUserAnswers({}); handleStartTest(activeTest._id); }} className="flex items-center justify-center gap-2 px-8 py-3.5 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg hover:shadow-xl"><RotateCcw size={18} /> Retake Test</button>
+                          <button onClick={() => { setShowResult(false); setCurrentQuestionIndex(0); setScore(0); setUserAnswers({}); setUserReasoning({}); handleStartTest(activeTest._id); }} className="flex items-center justify-center gap-2 px-8 py-3.5 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg hover:shadow-xl"><RotateCcw size={18} /> Retake Test</button>
                       </div>
                     </div>
                   ) : (
@@ -392,7 +427,7 @@ const Test = () => {
                         {currentQ.questionText}
                       </h3>
                       
-                      <div className="space-y-4">
+                      <div className="space-y-4 mb-8">
                         {currentQ.options.map((option, index) => {
                           const userAnswer = userAnswers[currentQuestionIndex];
                           const isSelected = isMultiple
@@ -409,7 +444,7 @@ const Test = () => {
                                     : 'border-slate-100 bg-white/40 hover:border-purple-200 hover:bg-white/70'
                                 }`}
                             >
-                              {/* --- UPDATED CHECKBOX / RADIO UI --- */}
+                              {/* CHECKBOX / RADIO UI */}
                               <div className={`w-6 h-6 flex items-center justify-center mr-5 shrink-0 transition-all duration-200
                                   ${!isMultiple ? 'rounded-full border-2' : 'rounded-md border-2'}
                                   ${isSelected
@@ -417,10 +452,7 @@ const Test = () => {
                                       : 'border-slate-300 group-hover:border-purple-400 bg-white'
                                   }
                               `}>
-                                  {/* RADIO DOT */}
                                   {!isMultiple && isSelected && <div className="w-2.5 h-2.5 bg-purple-600 rounded-full" />}
-
-                                  {/* CHECKBOX CHECK */}
                                   {isMultiple && isSelected && <Check size={14} className="text-white stroke-[3]" />}
                               </div>
 
@@ -431,6 +463,23 @@ const Test = () => {
                           )
                         })}
                       </div>
+
+                      {/* NEW: REASONING BOX */}
+                      {currentQ.requiresReasoning && (
+                          <div className="animate-in fade-in slide-in-from-bottom-2">
+                              <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                                  <MessageSquare size={16} className="text-purple-600" />
+                                  Why did you choose this answer?
+                              </label>
+                              <textarea 
+                                  value={userReasoning[currentQuestionIndex] || ""}
+                                  onChange={handleReasoningChange}
+                                  className="w-full p-4 border-2 border-slate-200 rounded-xl outline-none focus:border-purple-400 focus:ring-4 focus:ring-purple-50 transition-all text-slate-700 bg-white/50 backdrop-blur-sm"
+                                  placeholder="Explain your thought process..."
+                                  rows={3}
+                              />
+                          </div>
+                      )}
 
                       <div className="flex justify-between items-center mt-12 pt-8 border-t border-slate-200/60">
                         <button 

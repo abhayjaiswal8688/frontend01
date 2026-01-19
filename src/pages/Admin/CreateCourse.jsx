@@ -1,7 +1,7 @@
 // src/pages/Admin/CreateCourse.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Plus, Trash2, Save, BookOpen, Video, FileText, Layers, HelpCircle, Clock, X, Globe } from 'lucide-react';
+import { Plus, Trash2, Save, BookOpen, Video, FileText, Layers, HelpCircle, Clock, X, Globe, MessageSquare } from 'lucide-react';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -45,7 +45,7 @@ const CreateCourse = () => {
                     isPublic: c.isPublic || false 
                 });
                 
-                // DATA MIGRATION: Ensure questions use the new 'correctOptionIndices' array format
+                // DATA MIGRATION
                 if (c.modules) {
                     const migratedModules = c.modules.map(m => ({
                         ...m,
@@ -54,7 +54,8 @@ const CreateCourse = () => {
                             questions: l.questions ? l.questions.map(q => ({
                                 ...q,
                                 type: q.type || 'single',
-                                correctOptionIndices: q.correctOptionIndices || (q.correctOptionIndex !== undefined ? [q.correctOptionIndex] : [0])
+                                correctOptionIndices: q.correctOptionIndices || (q.correctOptionIndex !== undefined ? [q.correctOptionIndex] : [0]),
+                                requiresReasoning: q.requiresReasoning || false // Default for old data
                             })) : []
                         }))
                     }));
@@ -138,14 +139,14 @@ const CreateCourse = () => {
 
   // --- QUIZ QUESTION ACTIONS ---
   
-  // 1. UPDATED: Add Question with new structure
   const addQuestion = (mIndex, lIndex) => {
     const newModules = [...modules];
     newModules[mIndex].lessons[lIndex].questions.push({
         questionText: '',
-        options: ['', '', '', ''],
-        correctOptionIndices: [0], // Array for multiple correct
-        type: 'single' // 'single' or 'multiple'
+        options: ['', ''], // Start with 2 empty options
+        correctOptionIndices: [0], 
+        type: 'single',
+        requiresReasoning: false 
     });
     setModules(newModules);
   };
@@ -157,7 +158,6 @@ const CreateCourse = () => {
     if (field === 'options') {
         question.options[optionIndex] = value;
     } else if (field === 'type') {
-        // Reset answers when type changes to avoid invalid state
         question.type = value;
         question.correctOptionIndices = [0]; 
     } else {
@@ -166,7 +166,38 @@ const CreateCourse = () => {
     setModules(newModules);
   };
 
-  // 2. NEW: Handle Checkbox/Radio Logic
+  // --- DYNAMIC OPTIONS LOGIC ---
+  const addOptionToQuestion = (mIndex, lIndex, qIndex) => {
+    const newModules = [...modules];
+    newModules[mIndex].lessons[lIndex].questions[qIndex].options.push('');
+    setModules(newModules);
+  };
+
+  const removeOptionFromQuestion = (mIndex, lIndex, qIndex, optIndex) => {
+    const newModules = [...modules];
+    const question = newModules[mIndex].lessons[lIndex].questions[qIndex];
+    
+    // Don't allow less than 2 options
+    if (question.options.length <= 2) return;
+
+    // Remove the option
+    question.options = question.options.filter((_, i) => i !== optIndex);
+
+    // Re-calculate correct indices
+    // 1. If the removed option was correct, we must remove it from correctIndices
+    // 2. If a correct option was AFTER the removed one, its index shifts down by 1
+    question.correctOptionIndices = question.correctOptionIndices
+        .filter(idx => idx !== optIndex) // Remove if it was the one deleted
+        .map(idx => (idx > optIndex ? idx - 1 : idx)); // Shift down if needed
+
+    // Fallback: If no correct answer remains, default to 0
+    if (question.correctOptionIndices.length === 0) {
+        question.correctOptionIndices = [0];
+    }
+
+    setModules(newModules);
+  };
+
   const handleQuestionOptionToggle = (mIndex, lIndex, qIndex, optIndex) => {
     const newModules = [...modules];
     const q = newModules[mIndex].lessons[lIndex].questions[qIndex];
@@ -175,7 +206,6 @@ const CreateCourse = () => {
         q.correctOptionIndices = [optIndex];
     } else {
         if (q.correctOptionIndices.includes(optIndex)) {
-            // Prevent removing the last answer (must have at least one)
             if (q.correctOptionIndices.length > 1) {
                  q.correctOptionIndices = q.correctOptionIndices.filter(i => i !== optIndex);
             }
@@ -231,6 +261,7 @@ const CreateCourse = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Left: Metadata */}
             <div className="lg:col-span-1 space-y-6">
+                {/* ... Metadata inputs (Unchanged) ... */}
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                     <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><BookOpen size={18} /> Course Details</h3>
                     <div className="space-y-4">
@@ -290,7 +321,7 @@ const CreateCourse = () => {
                                                 <button onClick={() => removeLesson(mIndex, lIndex)} className="text-slate-300 hover:text-red-500"><Trash2 size={16} /></button>
                                             </div>
                                             
-                                            {/* --- TYPE & DURATION ROW --- */}
+                                            {/* Type & Duration */}
                                             <div className="flex flex-wrap items-center gap-3">
                                                 <select value={lesson.type} onChange={(e) => updateLesson(mIndex, lIndex, 'type', e.target.value)} className="bg-slate-50 border border-slate-200 text-xs rounded-lg px-2 py-1.5 outline-none font-medium text-slate-600">
                                                     <option value="video">Video</option>
@@ -298,7 +329,6 @@ const CreateCourse = () => {
                                                     <option value="quiz">Quiz</option>
                                                 </select>
                                                 
-                                                {/* --- DURATION PICKER BUTTON --- */}
                                                 <div className="relative">
                                                     <button 
                                                         onClick={() => setActiveTimer(isTimerOpen ? null : { mIndex, lIndex })}
@@ -310,55 +340,34 @@ const CreateCourse = () => {
                                                 </div>
                                             </div>
                                             
-                                            {/* --- EXPANDABLE CLOCK UI --- */}
+                                            {/* Clock UI (Unchanged) */}
                                             {isTimerOpen && (
                                                 <div className="p-4 bg-slate-50 rounded-xl border border-purple-100 animate-in fade-in slide-in-from-top-2">
+                                                    {/* ... (Clock UI code remains same) ... */}
                                                     <div className="flex justify-between items-center mb-3">
                                                         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Set Duration</span>
                                                         <button onClick={() => setActiveTimer(null)} className="text-slate-400 hover:text-slate-600"><X size={14} /></button>
                                                     </div>
-                                                    
-                                                    {/* Presets */}
                                                     <div className="flex flex-wrap gap-2 mb-4">
                                                         {timeOptions.map((t) => (
-                                                            <button 
-                                                                key={t} 
-                                                                onClick={() => handleDurationUpdate(mIndex, lIndex, 'preset', t)}
-                                                                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${lesson.duration === t ? 'bg-purple-600 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-500 hover:border-purple-300'}`}
-                                                            >
-                                                                {t}
-                                                            </button>
+                                                            <button key={t} onClick={() => handleDurationUpdate(mIndex, lIndex, 'preset', t)} className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${lesson.duration === t ? 'bg-purple-600 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-500 hover:border-purple-300'}`}>{t}</button>
                                                         ))}
                                                     </div>
-
-                                                    {/* Custom Inputs */}
                                                     <div className="flex items-center gap-3 bg-white p-3 rounded-lg border border-slate-200 shadow-sm w-fit">
                                                         <div className="flex flex-col items-center">
-                                                            <input 
-                                                                type="number" 
-                                                                min="0" max="23"
-                                                                value={parsedTime.h} 
-                                                                onChange={(e) => handleDurationUpdate(mIndex, lIndex, 'hours', e.target.value)}
-                                                                className="w-12 text-center p-1 border border-purple-200 rounded-md text-sm font-bold text-purple-900 outline-none focus:ring-2 focus:ring-purple-200" 
-                                                            />
+                                                            <input type="number" min="0" max="23" value={parsedTime.h} onChange={(e) => handleDurationUpdate(mIndex, lIndex, 'hours', e.target.value)} className="w-12 text-center p-1 border border-purple-200 rounded-md text-sm font-bold text-purple-900 outline-none focus:ring-2 focus:ring-purple-200" />
                                                             <span className="text-[10px] text-slate-400 font-bold mt-1">HRS</span>
                                                         </div>
                                                         <span className="text-purple-300 font-bold">:</span>
                                                         <div className="flex flex-col items-center">
-                                                            <input 
-                                                                type="number" 
-                                                                min="0" max="59"
-                                                                value={parsedTime.m} 
-                                                                onChange={(e) => handleDurationUpdate(mIndex, lIndex, 'minutes', e.target.value)}
-                                                                className="w-12 text-center p-1 border border-purple-200 rounded-md text-sm font-bold text-purple-900 outline-none focus:ring-2 focus:ring-purple-200" 
-                                                            />
+                                                            <input type="number" min="0" max="59" value={parsedTime.m} onChange={(e) => handleDurationUpdate(mIndex, lIndex, 'minutes', e.target.value)} className="w-12 text-center p-1 border border-purple-200 rounded-md text-sm font-bold text-purple-900 outline-none focus:ring-2 focus:ring-purple-200" />
                                                             <span className="text-[10px] text-slate-400 font-bold mt-1">MINS</span>
                                                         </div>
                                                     </div>
                                                 </div>
                                             )}
 
-                                            {/* CONTENT INPUTS BASED ON TYPE */}
+                                            {/* CONTENT INPUTS */}
                                             {lesson.type === 'video' && (
                                                 <input type="text" value={lesson.contentUrl} onChange={(e) => updateLesson(mIndex, lIndex, 'contentUrl', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none" placeholder="Video URL" />
                                             )}
@@ -375,35 +384,52 @@ const CreateCourse = () => {
                                             {lesson.questions.map((q, qIndex) => (
                                                 <div key={qIndex} className="bg-slate-50 p-3 rounded-lg border border-slate-200">
                                                     
-                                                    {/* QUESTION HEADER: Text & Type */}
-                                                    <div className="flex justify-between items-center mb-3">
-                                                        <input 
-                                                            type="text" 
-                                                            value={q.questionText} 
-                                                            onChange={(e) => updateQuestion(mIndex, lIndex, qIndex, 'questionText', e.target.value)} 
-                                                            className="flex-1 bg-transparent font-medium outline-none text-sm border-b border-transparent focus:border-purple-300 mr-2" 
-                                                            placeholder="Enter Question..." 
-                                                        />
+                                                    {/* QUESTION HEADER */}
+                                                    <div className="flex flex-col gap-3 mb-3">
+                                                        <div className="flex justify-between items-start gap-2">
+                                                            <input 
+                                                                type="text" 
+                                                                value={q.questionText} 
+                                                                onChange={(e) => updateQuestion(mIndex, lIndex, qIndex, 'questionText', e.target.value)} 
+                                                                className="flex-1 bg-transparent font-medium outline-none text-sm border-b border-transparent focus:border-purple-300" 
+                                                                placeholder="Enter Question..." 
+                                                            />
+                                                            <button onClick={() => removeQuestion(mIndex, lIndex, qIndex)} className="text-slate-400 hover:text-red-500"><Trash2 size={14} /></button>
+                                                        </div>
                                                         
-                                                        {/* 3. NEW: Question Type Selector */}
-                                                        <select 
-                                                            value={q.type} 
-                                                            onChange={(e) => updateQuestion(mIndex, lIndex, qIndex, 'type', e.target.value)}
-                                                            className="text-[10px] font-bold bg-white border border-slate-300 rounded px-2 py-1 outline-none text-slate-600 focus:border-purple-500 mr-2"
-                                                        >
-                                                            <option value="single">Single Choice</option>
-                                                            <option value="multiple">Multiple Choice</option>
-                                                        </select>
+                                                        {/* SETTINGS ROW */}
+                                                        <div className="flex items-center gap-4">
+                                                            <select 
+                                                                value={q.type} 
+                                                                onChange={(e) => updateQuestion(mIndex, lIndex, qIndex, 'type', e.target.value)}
+                                                                className="text-[10px] font-bold bg-white border border-slate-300 rounded px-2 py-1 outline-none text-slate-600 focus:border-purple-500"
+                                                            >
+                                                                <option value="single">Single Choice</option>
+                                                                <option value="multiple">Multiple Choice</option>
+                                                            </select>
 
-                                                        <button onClick={() => removeQuestion(mIndex, lIndex, qIndex)} className="text-slate-400 hover:text-red-500"><Trash2 size={14} /></button>
+                                                            {/* REASONING TOGGLE */}
+                                                            <label className="flex items-center gap-2 cursor-pointer group">
+                                                                <div className="relative">
+                                                                    <input 
+                                                                        type="checkbox" 
+                                                                        className="sr-only peer"
+                                                                        checked={q.requiresReasoning || false}
+                                                                        onChange={(e) => updateQuestion(mIndex, lIndex, qIndex, 'requiresReasoning', e.target.checked)}
+                                                                    />
+                                                                    <div className="w-8 h-4 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-purple-600"></div>
+                                                                </div>
+                                                                <span className="text-[10px] font-bold text-slate-500 group-hover:text-purple-600 flex items-center gap-1">
+                                                                    <MessageSquare size={12}/> Require Reasoning
+                                                                </span>
+                                                            </label>
+                                                        </div>
                                                     </div>
 
-                                                    {/* OPTIONS GRID */}
-                                                    <div className="grid grid-cols-2 gap-2">
+                                                    {/* DYNAMIC OPTIONS GRID */}
+                                                    <div className="space-y-2">
                                                         {q.options.map((opt, optIndex) => (
                                                             <div key={optIndex} className="flex items-center gap-2 group">
-                                                                
-                                                                {/* 4. NEW: Dynamic Input (Radio/Checkbox) */}
                                                                 <input 
                                                                     type={q.type === 'single' ? 'radio' : 'checkbox'} 
                                                                     name={`correct-${mIndex}-${lIndex}-${qIndex}`} 
@@ -423,8 +449,25 @@ const CreateCourse = () => {
                                                                     }`} 
                                                                     placeholder={`Option ${optIndex + 1}`} 
                                                                 />
+                                                                
+                                                                {/* Remove Option Button */}
+                                                                <button 
+                                                                    onClick={() => removeOptionFromQuestion(mIndex, lIndex, qIndex, optIndex)}
+                                                                    disabled={q.options.length <= 2}
+                                                                    className="text-slate-300 hover:text-red-500 disabled:opacity-0"
+                                                                >
+                                                                    <X size={14} />
+                                                                </button>
                                                             </div>
                                                         ))}
+                                                        
+                                                        {/* Add Option Button */}
+                                                        <button 
+                                                            onClick={() => addOptionToQuestion(mIndex, lIndex, qIndex)}
+                                                            className="text-[10px] font-bold text-slate-400 hover:text-purple-600 flex items-center gap-1 mt-1 ml-6"
+                                                        >
+                                                            <Plus size={12} /> Add Option
+                                                        </button>
                                                     </div>
                                                 </div>
                                             ))}

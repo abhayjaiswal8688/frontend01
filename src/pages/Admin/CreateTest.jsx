@@ -1,6 +1,8 @@
 // src/pages/Admin/CreateTest.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+// Added MessageSquare icon for the UI
+import { MessageSquare } from 'lucide-react'; 
 
 const CreateTest = () => {
   const navigate = useNavigate();
@@ -23,9 +25,15 @@ const CreateTest = () => {
   const [customCategoryName, setCustomCategoryName] = useState('');
   const genericIcons = ['star', 'bulb', 'heart', 'book', 'chart', 'user'];
 
-  // UPDATED: 'correctOptionIndex' replaced with 'correctOptionIndices' and 'type'
+  // UPDATED: Added 'requiresReasoning' to default state
   const [questions, setQuestions] = useState([
-    { questionText: '', options: ['', '', '', ''], correctOptionIndices: [0], type: 'single' }
+    { 
+        questionText: '', 
+        options: ['', '', '', ''], 
+        correctOptionIndices: [0], 
+        type: 'single',
+        requiresReasoning: false 
+    }
   ]);
   const [status, setStatus] = useState({ loading: false, error: '', success: '' });
 
@@ -52,11 +60,12 @@ const CreateTest = () => {
             .then(data => {
                 setTestTitle(data.title);
                 
-                // DATA MIGRATION: Convert old structure to new if necessary
+                // DATA MIGRATION: Handle old data + new fields
                 const migratedQuestions = data.questions.map(q => ({
                     ...q,
                     type: q.type || 'single',
-                    correctOptionIndices: q.correctOptionIndices || (q.correctOptionIndex !== undefined ? [q.correctOptionIndex] : [0])
+                    correctOptionIndices: q.correctOptionIndices || (q.correctOptionIndex !== undefined ? [q.correctOptionIndex] : [0]),
+                    requiresReasoning: q.requiresReasoning || false // Default to false
                 }));
                 setQuestions(migratedQuestions);
 
@@ -92,25 +101,21 @@ const CreateTest = () => {
     const newQuestions = [...questions];
     newQuestions[index][field] = value;
     
-    // Reset answers if type changes to prevent invalid states
+    // Reset answers if type changes
     if (field === 'type') {
         newQuestions[index].correctOptionIndices = [0]; 
     }
     setQuestions(newQuestions);
   };
 
-  // --- UPDATED: Handle Selection of Correct Answers ---
   const handleCorrectOptionChange = (qIndex, oIndex) => {
       const newQuestions = [...questions];
       const question = newQuestions[qIndex];
 
       if (question.type === 'single') {
-          // Radio behavior: Only one selected
           question.correctOptionIndices = [oIndex];
       } else {
-          // Checkbox behavior: Toggle selection
           if (question.correctOptionIndices.includes(oIndex)) {
-              // Prevent removing the last answer (must have at least one)
               if (question.correctOptionIndices.length > 1) {
                   question.correctOptionIndices = question.correctOptionIndices.filter(i => i !== oIndex);
               }
@@ -128,7 +133,13 @@ const CreateTest = () => {
   };
 
   const addNewQuestion = () => {
-    setQuestions([...questions, { questionText: '', options: ['', '', '', ''], correctOptionIndices: [0], type: 'single' }]);
+    setQuestions([...questions, { 
+        questionText: '', 
+        options: ['', '', '', ''], 
+        correctOptionIndices: [0], 
+        type: 'single',
+        requiresReasoning: false 
+    }]);
   };
 
   const removeQuestion = (index) => {
@@ -214,7 +225,7 @@ const CreateTest = () => {
           setTimeout(() => navigate('/admin'), 1500);
       } else {
           setTestTitle('');
-          setQuestions([{ questionText: '', options: ['', '', '', ''], correctOptionIndices: [0], type: 'single' }]);
+          setQuestions([{ questionText: '', options: ['', '', '', ''], correctOptionIndices: [0], type: 'single', requiresReasoning: false }]);
           setDurationMode('select');
           setSelectedDuration('15 mins');
           setCustomHours(0);
@@ -229,6 +240,7 @@ const CreateTest = () => {
     }
   };
 
+  // ... (renderIconSvg helper remains the same) ...
   const renderIconSvg = (id) => {
     switch(id) {
         case 'psychology': return <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>; 
@@ -258,6 +270,7 @@ const CreateTest = () => {
 
       <form onSubmit={handleSubmit}>
         
+        {/* ... (Title, Duration, Icon sections remain unchanged) ... */}
         <div className="mb-8">
             <label className="block text-gray-700 font-bold mb-2">Test Title</label>
             <input type="text" className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none text-lg" placeholder="e.g. Mental Health Nursing Finals" value={testTitle} onChange={(e) => setTestTitle(e.target.value)} />
@@ -287,6 +300,7 @@ const CreateTest = () => {
         </div>
 
         <div className="mb-10">
+            {/* ... (Icon Selection Logic same as provided in input) ... */}
             <label className="block text-gray-700 font-bold mb-3">Specialization Category</label>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
                 {iconOptions.map((icon) => (
@@ -326,7 +340,7 @@ const CreateTest = () => {
         {questions.map((q, qIndex) => (
           <div key={qIndex} className="mb-8 p-6 border border-gray-200 rounded-xl bg-gray-50 relative transition-all hover:shadow-md">
             
-            <div className="flex justify-between items-center mb-4 bg-gray-100 p-3 rounded-lg">
+            <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-4 bg-gray-100 p-3 rounded-lg">
               <div className="flex items-center gap-3">
                  <h4 className="font-bold text-lg text-gray-700">Question {qIndex + 1}</h4>
                  <div className="flex gap-1 ml-4 bg-white rounded border border-gray-200">
@@ -336,16 +350,32 @@ const CreateTest = () => {
                  </div>
               </div>
               
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-4">
                   {/* TYPE SELECTOR */}
                   <select 
                     value={q.type} 
                     onChange={(e) => handleQuestionChange(qIndex, 'type', e.target.value)}
-                    className="text-xs bg-white border border-gray-300 rounded px-2 py-1 outline-none focus:border-purple-500"
+                    className="text-xs bg-white border border-gray-300 rounded px-2 py-2 outline-none focus:border-purple-500 font-bold text-gray-600"
                   >
                       <option value="single">Single Choice</option>
                       <option value="multiple">Multiple Choice</option>
                   </select>
+
+                  {/* REASONING TOGGLE */}
+                  <label className="flex items-center gap-2 cursor-pointer group bg-white px-2 py-1.5 rounded border border-gray-200 hover:border-purple-200">
+                    <div className="relative">
+                        <input 
+                            type="checkbox" 
+                            className="sr-only peer"
+                            checked={q.requiresReasoning || false}
+                            onChange={(e) => handleQuestionChange(qIndex, 'requiresReasoning', e.target.checked)}
+                        />
+                        <div className="w-8 h-4 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-purple-600"></div>
+                    </div>
+                    <span className="text-[10px] font-bold text-gray-500 group-hover:text-purple-600 flex items-center gap-1">
+                        <MessageSquare size={12}/> Require Reasoning
+                    </span>
+                  </label>
 
                   {questions.length > 1 && (
                     <button type="button" onClick={() => removeQuestion(qIndex)} className="text-red-500 hover:text-red-700 text-sm font-semibold px-3 py-1 hover:bg-red-50 rounded transition-colors">Remove</button>
@@ -358,7 +388,6 @@ const CreateTest = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {q.options.map((opt, oIndex) => (
                 <div key={oIndex} className="flex items-center group">
-                    {/* DYNAMIC INPUT TYPE (Radio or Checkbox) */}
                     <input 
                       type={q.type === 'single' ? "radio" : "checkbox"}
                       name={`correct-${qIndex}`} 

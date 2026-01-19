@@ -4,7 +4,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { 
     User, Mail, ArrowLeft, BookOpen, TrendingUp, Award, 
     Calendar, CheckCircle, BarChart2, ChevronDown, ChevronUp, 
-    Trash2, AlertTriangle, X, Download // <--- Added Download
+    Trash2, AlertTriangle, X, Download, Eye 
 } from 'lucide-react';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -22,15 +22,11 @@ const StudentDetails = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [expandedCourseId, setExpandedCourseId] = useState(null);
 
-  // --- DELETE MODAL STATE ---
   const [deleteModal, setDeleteModal] = useState({ open: false, item: null });
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
 
   const [stats, setStats] = useState({
-      coursesInProgress: 0,
-      coursesCompleted: 0,
-      totalQuizzesTaken: 0,
-      avgScore: 0
+      coursesInProgress: 0, coursesCompleted: 0, totalQuizzesTaken: 0, avgScore: 0
   });
 
   useEffect(() => {
@@ -83,35 +79,23 @@ const StudentDetails = () => {
               method: 'DELETE',
               headers: { 'Authorization': `Bearer ${token}` }
           });
-
           if (res.ok) {
               setEnrollments(prev => prev.filter(e => e.course._id !== courseId));
               setDeleteModal({ open: false, item: null });
               setDeleteConfirmation('');
-          } else {
-              alert("Failed to unenroll student.");
-          }
-      } catch (err) {
-          console.error(err);
-      }
+          } else { alert("Failed to unenroll student."); }
+      } catch (err) { console.error(err); }
   };
 
-  // --- NEW: EXPORT FUNCTION ---
   const handleExport = () => {
       const headers = ["Type,Item,Category,Details,Status,Date"];
       const rows = [];
-
-      // 1. Courses
       enrollments.forEach(e => {
           rows.push(`"Course","${e.course.title}","${e.course.category}","Progress: ${e.courseProgress}%","${e.courseProgress >= 100 ? 'Completed' : 'In Progress'}","${new Date(e.lastActive).toLocaleDateString()}"`);
       });
-
-      // 2. Standalone Assessments
       testHistory.forEach(t => {
            rows.push(`"Assessment","${t.testTitle}","${t.category || 'General'}","Score: ${t.score}/${t.totalQuestions} (${t.percentage}%)","${t.percentage >= 50 ? 'Passed' : 'Failed'}","${new Date(t.createdAt).toLocaleDateString()}"`);
       });
-
-      // 3. Course Quizzes
       enrollments.forEach(e => {
           if(e.quizScores) {
               e.quizScores.forEach(q => {
@@ -119,9 +103,7 @@ const StudentDetails = () => {
               });
           }
       });
-
       if (rows.length === 0) return alert("No data to export.");
-
       const csvContent = [headers, ...rows].join("\n");
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
@@ -133,20 +115,61 @@ const StudentDetails = () => {
       document.body.removeChild(link);
   };
 
+  // --- NAVIGATION HELPERS ---
+  const handleViewQuiz = (quizData, courseId, courseTitle) => {
+      navigate('/admin/quiz-result', {
+          state: {
+              quizData: quizData,
+              courseId: courseId,
+              courseTitle: courseTitle,
+              studentName: studentInfo?.name
+          }
+      });
+  };
+
+  const handleViewTest = (resultData) => {
+      navigate('/admin/test-result', {
+          state: {
+              resultData: resultData,
+              studentName: studentInfo?.name
+          }
+      });
+  };
+
   const getRecentActivity = () => {
       const activities = [];
       testHistory.forEach(t => {
           activities.push({
-              id: t._id, type: 'Assessment', title: t.testTitle, category: t.category || 'General',
-              date: new Date(t.createdAt), score: t.score, total: t.totalQuestions, percentage: t.percentage
+              id: t._id, 
+              type: 'Assessment', 
+              title: t.testTitle, 
+              category: t.category || 'General',
+              date: new Date(t.createdAt), 
+              score: t.score, 
+              total: t.totalQuestions, 
+              percentage: t.percentage,
+              
+              // DATA FOR NAV
+              rawResultData: t 
           });
       });
       enrollments.forEach(e => {
           if (e.quizScores) {
               e.quizScores.forEach(q => {
                   activities.push({
-                      id: `${e._id}-${q.lessonId}`, type: 'Course Quiz', title: q.lessonTitle, category: e.course.category,
-                      date: new Date(q.attemptedAt), score: q.score, total: q.totalQuestions, percentage: q.percentage
+                      id: `${e._id}-${q.lessonId}`, 
+                      type: 'Course Quiz', 
+                      title: q.lessonTitle, 
+                      category: e.course.category,
+                      date: new Date(q.attemptedAt), 
+                      score: q.score, 
+                      total: q.totalQuestions, 
+                      percentage: q.percentage,
+                      
+                      // DATA FOR NAV
+                      rawQuizData: q,
+                      courseId: e.course._id,
+                      courseTitle: e.course.title
                   });
               });
           }
@@ -178,7 +201,7 @@ const StudentDetails = () => {
             </button>
         </div>
 
-        {/* Profile Card */}
+        {/* Profile Card (Unchanged) */}
         <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 flex flex-col md:flex-row items-center gap-8 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-indigo-50 to-blue-50 rounded-full blur-3xl opacity-50 -translate-y-1/2 translate-x-1/4"></div>
             <div className="relative z-10 w-20 h-20 md:w-24 md:h-24 bg-gradient-to-br from-slate-800 to-slate-900 text-white rounded-2xl flex items-center justify-center shadow-xl">
@@ -204,7 +227,6 @@ const StudentDetails = () => {
             </div>
         </div>
 
-        {/* ... [Grid Layout - Courses & Stats] - Keeping layout same ... */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-6">
                 <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
@@ -265,12 +287,21 @@ const StudentDetails = () => {
                                                         ))}
                                                     </div>
                                                 </div>
+                                                
+                                                {/* QUIZ PERFORMANCE LIST */}
                                                 <div>
                                                     <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Quiz Performance</h4>
                                                     <div className="space-y-2">
                                                         {enrollment.quizScores?.map((quiz, i) => (
-                                                            <div key={i} className="flex justify-between items-center p-2 rounded hover:bg-white transition-colors">
-                                                                <span className="text-xs font-medium text-slate-700 truncate">{quiz.lessonTitle}</span>
+                                                            <div 
+                                                                key={i} 
+                                                                onClick={() => handleViewQuiz(quiz, enrollment.course._id, enrollment.course.title)}
+                                                                className="flex justify-between items-center p-2 rounded-lg bg-white border border-transparent hover:border-slate-200 hover:shadow-sm cursor-pointer transition-all group"
+                                                            >
+                                                                <div className="flex items-center gap-2 overflow-hidden">
+                                                                    <div className="p-1 rounded bg-slate-50 text-slate-400 group-hover:text-indigo-600 transition-colors"><Eye size={14} /></div>
+                                                                    <span className="text-xs font-medium text-slate-700 truncate group-hover:text-indigo-900">{quiz.lessonTitle}</span>
+                                                                </div>
                                                                 <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${getScoreColor(quiz.percentage)}`}>{quiz.percentage}%</span>
                                                             </div>
                                                         ))}
@@ -294,18 +325,31 @@ const StudentDetails = () => {
                     <TrendingUp size={20} className="text-emerald-500" /> Recent Activity
                 </h2>
                 
+                {/* RECENT ACTIVITY LIST - UPDATED */}
                 <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                     {recentActivity.length > 0 ? (
                         <div className="divide-y divide-slate-50">
                             {recentActivity.map((activity, idx) => (
-                                <div key={idx} className="p-4 hover:bg-slate-50 transition-colors">
+                                <div 
+                                    key={idx} 
+                                    onClick={() => {
+                                        if (activity.type === 'Course Quiz') handleViewQuiz(activity.rawQuizData, activity.courseId, activity.courseTitle);
+                                        if (activity.type === 'Assessment') handleViewTest(activity.rawResultData);
+                                    }}
+                                    className={`p-4 transition-colors cursor-pointer hover:bg-slate-50 group`}
+                                >
                                     <div className="flex justify-between items-start mb-1">
                                         <div>
                                             <div className="flex items-center gap-2 mb-1">
                                                 <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wide ${activity.type === 'Assessment' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-purple-50 text-purple-600 border-purple-100'}`}>{activity.type}</span>
                                                 <span className="text-[10px] text-slate-400 font-medium flex items-center gap-1"><Calendar size={10} /> {activity.date.toLocaleDateString()}</span>
                                             </div>
-                                            <h4 className="font-bold text-slate-800 text-sm">{activity.title}</h4>
+                                            <div className="flex items-center gap-2">
+                                                <h4 className={`font-bold text-sm text-slate-800 group-hover:text-indigo-700`}>
+                                                    {activity.title}
+                                                </h4>
+                                                <Eye size={12} className="text-slate-300 group-hover:text-indigo-500" />
+                                            </div>
                                         </div>
                                         <div className={`px-2 py-1 rounded-md text-xs font-bold border ${getScoreColor(activity.percentage)}`}>{activity.percentage}%</div>
                                     </div>
@@ -317,6 +361,7 @@ const StudentDetails = () => {
                     )}
                 </div>
 
+                {/* Overall Stats Chart (Unchanged) */}
                 <div className="bg-white rounded-2xl p-6 shadow-xl border border-slate-100 relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-100 rounded-full blur-2xl opacity-50 -mr-10 -mt-10"></div>
                     <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-slate-900"><BarChart2 size={18} className="text-indigo-600" /> Overall Stats</h3>
