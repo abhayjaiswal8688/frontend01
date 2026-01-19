@@ -5,7 +5,7 @@ import {
     User, Mail, Clock, Calendar, BookOpen, 
     TrendingUp, Award, PlayCircle, CheckCircle, 
     ChevronRight, BarChart2, ChevronDown, ChevronUp, FileText,
-    Download, Eye // <--- Added Eye Icon
+    Download, Eye, EyeOff, Lock // <--- Added EyeOff
 } from 'lucide-react';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -25,6 +25,17 @@ const StudentDashboard = () => {
       totalQuizzesTaken: 0,
       avgScore: 0
   });
+
+  // --- PASSWORD MODAL STATE ---
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passData, setPassData] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [passMessage, setPassMessage] = useState({ type: '', text: '' });
+  const [passLoading, setPassLoading] = useState(false);
+
+  // --- PASSWORD VISIBILITY STATE ---
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -115,6 +126,56 @@ const StudentDashboard = () => {
       document.body.removeChild(link);
   };
 
+  // --- PASSWORD HANDLER ---
+  const handlePasswordUpdate = async (e) => {
+      e.preventDefault();
+      setPassMessage({ type: '', text: '' });
+
+      if (passData.newPassword !== passData.confirmPassword) {
+          return setPassMessage({ type: 'error', text: "New passwords do not match." });
+      }
+      if (passData.newPassword.length < 6) {
+          return setPassMessage({ type: 'error', text: "Password must be at least 6 characters." });
+      }
+
+      setPassLoading(true);
+      try {
+          const token = localStorage.getItem('token');
+          const res = await fetch(`${API_BASE_URL}/auth/change-password`, {
+              method: 'PUT',
+              headers: { 
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}` 
+              },
+              body: JSON.stringify({ 
+                  currentPassword: passData.currentPassword,
+                  newPassword: passData.newPassword 
+              })
+          });
+
+          const data = await res.json();
+          if (res.ok) {
+              setPassMessage({ type: 'success', text: "Password updated successfully!" });
+              setPassData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+              // Reset visibility
+              setShowCurrent(false);
+              setShowNew(false);
+              setShowConfirm(false);
+              
+              setTimeout(() => {
+                  setShowPasswordModal(false);
+                  setPassMessage({ type: '', text: '' });
+              }, 2000);
+          } else {
+              setPassMessage({ type: 'error', text: data.message || "Failed to update password." });
+          }
+      } catch (err) {
+          setPassMessage({ type: 'error', text: "Server error. Please try again." });
+      } finally {
+          setPassLoading(false);
+      }
+  };
+
   // --- NAVIGATION HELPERS ---
   const handleViewQuiz = (quizData, courseId, courseTitle) => {
       navigate('/admin/quiz-result', {
@@ -122,7 +183,7 @@ const StudentDashboard = () => {
               quizData: quizData,
               courseId: courseId,
               courseTitle: courseTitle,
-              studentName: userData?.name // Pass current user name
+              studentName: userData?.name 
           }
       });
   };
@@ -149,7 +210,6 @@ const StudentDashboard = () => {
               total: t.totalQuestions, 
               percentage: t.percentage, 
               context: 'Standalone',
-              // Data for nav
               rawResultData: t 
           });
       });
@@ -166,7 +226,6 @@ const StudentDashboard = () => {
                       total: q.totalQuestions, 
                       percentage: q.percentage, 
                       context: e.course.title,
-                      // Data for nav
                       rawQuizData: q,
                       courseId: e.course._id,
                       courseTitle: e.course.title
@@ -192,7 +251,7 @@ const StudentDashboard = () => {
   const recentActivity = getRecentActivity();
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 md:p-10 font-sans text-slate-800">
+    <div className="min-h-screen bg-slate-50 p-6 md:p-10 font-sans text-slate-800 relative">
       <div className="max-w-7xl mx-auto space-y-8">
         
         {/* === HEADER === */}
@@ -223,18 +282,26 @@ const StudentDashboard = () => {
                     </div>
                 </div>
                 
-                {/* Export Button */}
-                <button 
-                    onClick={handleExport}
-                    className="flex items-center cursor-pointer gap-2 px-4 py-2 bg-white text-black hover:bg-black hover:text-white text-xs font-bold rounded-xl transition shadow-sm border border-slate-100"
-                >
-                    <Download size={14} /> Export My Report
-                </button>
+                {/* Buttons Row */}
+                <div className="flex gap-2">
+                    <button 
+                        onClick={() => setShowPasswordModal(true)}
+                        className="flex items-center cursor-pointer gap-2 px-4 py-2 bg-white text-slate-600 hover:text-purple-600 hover:border-purple-200 text-xs font-bold rounded-xl transition shadow-sm border border-slate-100"
+                    >
+                        <Lock size={14} /> Change Password
+                    </button>
+                    <button 
+                        onClick={handleExport}
+                        className="flex items-center cursor-pointer gap-2 px-4 py-2 bg-slate-900 text-white hover:bg-purple-600 text-xs font-bold rounded-xl transition shadow-md shadow-purple-100"
+                    >
+                        <Download size={14} /> Export My Report
+                    </button>
+                </div>
             </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            
+            {/* ... (Main Content Layout - Unchanged) ... */}
             {/* === LEFT COL: MY COURSES === */}
             <div className="lg:col-span-2 space-y-6">
                 <div className="flex justify-between items-end">
@@ -420,7 +487,7 @@ const StudentDashboard = () => {
                     )}
                 </div>
 
-                {/* Performance Summary Card (Light Theme) */}
+                {/* Performance Summary Card */}
                 <div className="bg-white rounded-2xl p-6 shadow-xl border border-slate-100 relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-purple-100 rounded-full blur-2xl opacity-50 -mr-10 -mt-10"></div>
                     <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-slate-900">
@@ -447,6 +514,115 @@ const StudentDashboard = () => {
 
         </div>
       </div>
+
+      {/* --- CHANGE PASSWORD MODAL --- */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 relative">
+                <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                    <Lock size={20} className="text-purple-600" /> Change Password
+                </h3>
+                
+                <form onSubmit={handlePasswordUpdate} className="space-y-4">
+                    
+                    {/* Current Password */}
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Current Password</label>
+                        <div className="relative">
+                            <input 
+                                type={showCurrent ? "text" : "password"} 
+                                required
+                                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-50 transition-all text-sm pr-10"
+                                value={passData.currentPassword}
+                                onChange={(e) => setPassData({...passData, currentPassword: e.target.value})}
+                            />
+                            <button 
+                                type="button"
+                                onClick={() => setShowCurrent(!showCurrent)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-purple-600"
+                            >
+                                {showCurrent ? <EyeOff size={16} /> : <Eye size={16} />}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* New Password */}
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">New Password</label>
+                        <div className="relative">
+                            <input 
+                                type={showNew ? "text" : "password"} 
+                                required
+                                minLength={6}
+                                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-50 transition-all text-sm pr-10"
+                                value={passData.newPassword}
+                                onChange={(e) => setPassData({...passData, newPassword: e.target.value})}
+                            />
+                            <button 
+                                type="button"
+                                onClick={() => setShowNew(!showNew)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-purple-600"
+                            >
+                                {showNew ? <EyeOff size={16} /> : <Eye size={16} />}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Confirm Password */}
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Confirm New Password</label>
+                        <div className="relative">
+                            <input 
+                                type={showConfirm ? "text" : "password"} 
+                                required
+                                minLength={6}
+                                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-50 transition-all text-sm pr-10"
+                                value={passData.confirmPassword}
+                                onChange={(e) => setPassData({...passData, confirmPassword: e.target.value})}
+                            />
+                            <button 
+                                type="button"
+                                onClick={() => setShowConfirm(!showConfirm)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-purple-600"
+                            >
+                                {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                            </button>
+                        </div>
+                    </div>
+
+                    {passMessage.text && (
+                        <div className={`text-xs font-bold p-3 rounded-lg text-center ${passMessage.type === 'error' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                            {passMessage.text}
+                        </div>
+                    )}
+
+                    <div className="flex gap-3 mt-6">
+                        <button 
+                            type="button" 
+                            onClick={() => { 
+                                setShowPasswordModal(false); 
+                                setPassMessage({type:'', text:''}); 
+                                setPassData({currentPassword:'', newPassword:'', confirmPassword:''}); 
+                                setShowCurrent(false);
+                                setShowNew(false);
+                                setShowConfirm(false);
+                            }}
+                            className="flex-1 py-3 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-colors text-sm"
+                        >
+                            Cancel
+                        </button>
+                        <button 
+                            type="submit" 
+                            disabled={passLoading}
+                            className="flex-1 py-3 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 shadow-lg shadow-purple-200 transition-all text-sm disabled:opacity-70 disabled:cursor-not-allowed"
+                        >
+                            {passLoading ? 'Updating...' : 'Update Password'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+      )}
     </div>
   );
 };
